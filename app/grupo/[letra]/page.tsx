@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { GROUPS, TEAMS_BY_SLUG, BASE_MATCHES } from '@/lib/data'
-import { MatchRow } from '@/components/MatchRow'
+import { LiveGroupStandings } from '@/components/LiveGroupStandings'
 
 interface Props {
   params: Promise<{ letra: string }>
@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const letter = letra.toUpperCase()
   return {
     title: `Grupo ${letter}`,
-    description: `Equipos y partidos del Grupo ${letter} en el Mundial 2026.`,
+    description: `Tabla de posiciones y partidos del Grupo ${letter} — Mundial 2026.`,
   }
 }
 
@@ -33,9 +33,8 @@ export default async function GrupoPage({ params }: Props) {
   const group = GROUPS.find(g => g.letter === letter)
   if (!group) notFound()
 
-  const fullTeams = group.teams.map(t => TEAMS_BY_SLUG[t.slug]).filter(Boolean)
-  const matches = BASE_MATCHES.filter(m => m.group === letter)
   const color = GROUP_COLORS[letter] ?? 'var(--green)'
+  const groupMatches = BASE_MATCHES.filter(m => m.group === letter)
 
   return (
     <div className="content-area">
@@ -44,13 +43,20 @@ export default async function GrupoPage({ params }: Props) {
       </Link>
 
       {/* HEADER */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 32, paddingBottom: 24, borderBottom: '1px solid var(--border)' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 16,
+        marginBottom: 32, paddingBottom: 24,
+        borderBottom: '1px solid var(--border)',
+      }}>
         <div style={{
           width: 6, borderRadius: 4,
           alignSelf: 'stretch', background: color, flexShrink: 0,
         }} />
         <div>
-          <div style={{ fontFamily: 'var(--display)', fontSize: 56, letterSpacing: '.04em', color: 'var(--text)', lineHeight: 1 }}>
+          <div style={{
+            fontFamily: 'var(--display)', fontSize: 56,
+            letterSpacing: '.04em', color: 'var(--text)', lineHeight: 1,
+          }}>
             GRUPO {letter}
           </div>
           <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>
@@ -59,48 +65,59 @@ export default async function GrupoPage({ params }: Props) {
         </div>
       </div>
 
-      {/* EQUIPOS */}
-      <div style={{ marginBottom: 40 }}>
-        <div className="team-section-title">SELECCIONES</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10, marginTop: 14 }}>
-          {fullTeams.map(t => (
-            <Link
-              key={t.slug}
-              href={`/equipo/${t.slug}`}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                background: t.isChampion ? 'var(--arg)' : 'var(--surface)',
-                border: `1px solid ${t.isChampion ? 'var(--arg-border)' : 'var(--border)'}`,
-                borderRadius: 12, padding: '14px 16px',
-                color: 'var(--text)', textDecoration: 'none', transition: 'border-color .15s',
-              } as React.CSSProperties}
-            >
-              <span style={{ fontSize: 28, lineHeight: 1 }}>{t.flag}</span>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: t.isChampion ? 700 : 500 }}>{t.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{t.confederation}</div>
-              </div>
-              {t.isChampion && (
-                <span className="champ-badge" style={{ marginLeft: 'auto' }}>★</span>
-              )}
-            </Link>
-          ))}
-        </div>
-      </div>
+      {/* TABLA EN VIVO + PARTIDOS (client component) */}
+      <LiveGroupStandings
+        groupLetter={letter}
+        initialMatches={groupMatches}
+      />
 
-      {/* PARTIDOS */}
-      <div>
-        <div className="team-section-title">PARTIDOS</div>
-        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 0 }}>
-          {matches.map(m => (
-            <MatchRow key={m.id} match={m} showGroup={false} />
-          ))}
+      {/* EQUIPOS */}
+      <div style={{ marginTop: 40 }}>
+        <div className="team-section-title">SELECCIONES</div>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+          gap: 10, marginTop: 14,
+        }}>
+          {group.teams.map(t => {
+            const full = TEAMS_BY_SLUG[t.slug]
+            return (
+              <Link
+                key={t.slug}
+                href={`/equipo/${t.slug}`}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  background: full?.isChampion ? 'var(--arg)' : 'var(--surface)',
+                  border: `1px solid ${full?.isChampion ? 'var(--arg-border)' : 'var(--border)'}`,
+                  borderRadius: 12, padding: '14px 16px',
+                  color: 'var(--text)', textDecoration: 'none',
+                  transition: 'border-color .15s',
+                } as React.CSSProperties}
+              >
+                <span style={{ fontSize: 28, lineHeight: 1 }}>{t.flag}</span>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: full?.isChampion ? 700 : 500 }}>
+                    {t.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                    {full?.confederation}
+                  </div>
+                </div>
+                {full?.isChampion && (
+                  <span className="champ-badge" style={{ marginLeft: 'auto' }}>★</span>
+                )}
+              </Link>
+            )
+          })}
         </div>
       </div>
 
       {/* NAVEGACIÓN ENTRE GRUPOS */}
       <div style={{ marginTop: 48, paddingTop: 32, borderTop: '1px solid var(--border)' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 14 }}>
+        <div style={{
+          fontSize: 11, fontWeight: 700, letterSpacing: '.1em',
+          textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 14,
+        }}>
           Otros grupos
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -110,7 +127,8 @@ export default async function GrupoPage({ params }: Props) {
               href={`/grupo/${l.toLowerCase()}`}
               style={{
                 fontFamily: 'var(--display)', fontSize: 20, letterSpacing: '.04em',
-                width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 44, height: 44, display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
                 background: 'var(--surface)', border: '1px solid var(--border)',
                 borderRadius: 10, color: 'var(--text)', textDecoration: 'none',
                 transition: 'border-color .15s',

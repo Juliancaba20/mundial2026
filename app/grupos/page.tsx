@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { GROUPS, TEAMS_BY_SLUG } from '@/lib/data'
+import { GROUPS, TEAMS_BY_SLUG, BASE_MATCHES } from '@/lib/data'
+import { calculateStandings } from '@/lib/standings'
+import { StandingsTable } from '@/components/StandingsTable'
 
 export const metadata: Metadata = {
   title: 'Grupos',
-  description: 'Los 12 grupos del Mundial 2026. 48 selecciones, clasifican los 2 primeros de cada grupo más los 8 mejores terceros.',
+  description: 'Tabla de posiciones de los 12 grupos del Mundial 2026. Actualizada con resultados en vivo.',
 }
 
 const GROUP_COLORS = [
@@ -17,7 +19,9 @@ export default function GruposPage() {
     <div className="content-area">
       <div className="page-header">
         <div className="page-title">GRUPOS</div>
-        <div className="page-sub">12 grupos · 4 equipos cada uno · clasifican los 2 primeros + 8 mejores terceros</div>
+        <div className="page-sub">
+          12 grupos · tabla de posiciones en tiempo real · clasifican los 2 primeros + 8 mejores terceros
+        </div>
       </div>
 
       <div className="groups-grid">
@@ -25,6 +29,9 @@ export default function GruposPage() {
           const fullTeams = group.teams.map(t => TEAMS_BY_SLUG[t.slug])
           const hasChamp = fullTeams.some(t => t?.isChampion)
           const color = GROUP_COLORS[gi]
+          // Calcular posiciones con los datos base (el servidor no tiene los live)
+          // En /grupo/[letra] se usa el componente client que sí los tiene
+          const standings = calculateStandings(group.letter, BASE_MATCHES)
 
           return (
             <div key={group.letter} className={`g-card${hasChamp ? ' arg-group' : ''}`}>
@@ -37,22 +44,12 @@ export default function GruposPage() {
                   href={`/grupo/${group.letter.toLowerCase()}`}
                   style={{ color: 'var(--green)', fontSize: 11, fontWeight: 500 }}
                 >
-                  Ver grupo →
+                  Ver en vivo →
                 </Link>
               </div>
-              <div>
-                {group.teams.map(t => {
-                  const full = TEAMS_BY_SLUG[t.slug]
-                  return (
-                    <Link key={t.slug} href={`/equipo/${t.slug}`} className="g-team">
-                      <span className="g-flag">{t.flag}</span>
-                      <span className={`g-name${full?.isChampion ? ' bold' : ''}`}>{t.name}</span>
-                      {full?.isChampion && <span className="champ-badge">★ Campeona</span>}
-                      <span className="g-arrow">›</span>
-                    </Link>
-                  )
-                })}
-              </div>
+
+              {/* TABLA DE POSICIONES COMPACTA */}
+              <StandingsTable standings={standings} compact={true} />
             </div>
           )
         })}

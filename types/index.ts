@@ -1,22 +1,23 @@
 // ─── Equipos ─────────────────────────────────────────────────────────────────
 
 export interface TeamRef {
-  flag: string   // emoji
-  name: string   // nombre en español
-  slug: string   // URL-safe: "argentina", "estados-unidos"
+  flag: string     // emoji (se mantiene para compatibilidad)
+  flagCode: string // ISO 3166-1 alpha-2 para flagcdn.com — ej: "ar", "gb-sct"
+  name: string
+  slug: string
 }
 
 export interface Team extends TeamRef {
-  group: string           // "J"
+  group: string
   isChampion?: boolean
-  confederation: string   // "CONMEBOL", "UEFA", etc.
-  description?: string    // para página de equipo
+  confederation: string
+  description?: string
 }
 
 // ─── Grupos ──────────────────────────────────────────────────────────────────
 
 export interface Group {
-  letter: string     // "A" … "L"
+  letter: string
   teams: TeamRef[]
 }
 
@@ -25,19 +26,47 @@ export interface Group {
 export type MatchStatus = 'pending' | 'live' | 'done'
 
 export interface Match {
-  id: string              // "A-MEX-ZAF-1"
-  date: string            // "11 jun"
-  dateSort: number        // 20260611
-  group: string           // "A"
+  id: string
+  date: string
+  dateSort: number
+  group: string
   home: TeamRef
   away: TeamRef
   venue: string
   isArgentina?: boolean
-  // Se populan desde la API ESPN en runtime
-  score?: string          // "2 – 0"
+  score?: string
   status: MatchStatus
-  clock?: string          // "45'" durante partidos en vivo
+  clock?: string
 }
+
+// ─── Bracket ─────────────────────────────────────────────────────────────────
+
+export interface BracketSlot {
+  label: string          // "1° Grupo A" o nombre real del equipo
+  team: TeamRef | null   // null mientras no se conoce el clasificado
+  score?: string
+  winner?: boolean       // true = ganador de este partido
+}
+
+export interface BracketMatch {
+  id: string             // "R32-1", "R16-1", "QF-1", "SF-1", "F", "3RD"
+  round: BracketRound
+  date: string
+  home: BracketSlot
+  away: BracketSlot
+  status: MatchStatus
+  // índices del siguiente partido en el bracket (para dibujar líneas)
+  nextMatchId?: string
+  nextPosition?: 'home' | 'away'
+}
+
+export type BracketRound =
+  | 'R32'   // 16avos
+  | 'R16'   // octavos
+  | 'QF'    // cuartos
+  | 'SF'    // semis
+  | 'F'     // final
+  | '3RD'   // tercer puesto
 
 // ─── Noticias ────────────────────────────────────────────────────────────────
 
@@ -46,7 +75,7 @@ export interface NewsArticle {
   tag: string
   headline: string
   excerpt: string
-  body: string            // Markdown o HTML — listo para CMS futuro
+  body: string
   date: string
   emoji: string
   featured: boolean
@@ -58,10 +87,7 @@ export interface NewsArticle {
 export interface ESPNCompetitor {
   homeAway: 'home' | 'away'
   score?: string
-  team: {
-    displayName: string
-    name: string
-  }
+  team: { displayName: string; name: string }
 }
 
 export interface ESPNEvent {
@@ -72,16 +98,12 @@ export interface ESPNEvent {
     type: { name: string }
     displayClock: string
   }
-  competitions: Array<{
-    competitors: ESPNCompetitor[]
-  }>
+  competitions: Array<{ competitors: ESPNCompetitor[] }>
 }
 
 export interface ESPNResponse {
   events: ESPNEvent[]
 }
-
-// ─── Resultado procesado (ESPN → app) ────────────────────────────────────────
 
 export interface LiveResult {
   homeScore: string
@@ -91,4 +113,3 @@ export interface LiveResult {
 }
 
 export type LiveResultsMap = Record<string, LiveResult>
-// key: "home-slug_away-slug" ej: "mexico_sudafrica"
