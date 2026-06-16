@@ -199,10 +199,23 @@ export async function fetchLiveResults(): Promise<LiveResultsMap> {
       const htName = ht.team?.displayName ?? ht.team?.name ?? ''
       const atName = at.team?.displayName ?? at.team?.name ?? ''
 
-      const match = BASE_MATCHES.find(m =>
+      // Buscar coincidencia directa (home=home, away=away)
+      let match = BASE_MATCHES.find(m =>
         matchTeamName(htName, m.home.name) &&
         matchTeamName(atName, m.away.name)
       )
+      let reversed = false
+
+      // Fallback: ESPN puede invertir localía respecto a nuestros datos
+      // (ej: ESPN reporta "Qatar vs Switzerland" cuando nuestro dato es
+      // "Suiza vs Qatar"). El partido es el mismo, solo cambia quién es local.
+      if (!match) {
+        match = BASE_MATCHES.find(m =>
+          matchTeamName(htName, m.away.name) &&
+          matchTeamName(atName, m.home.name)
+        )
+        reversed = true
+      }
 
       if (match) {
         matched++
@@ -210,12 +223,14 @@ export async function fetchLiveResults(): Promise<LiveResultsMap> {
         // No sobreescribir un resultado final con uno de halftime
         if (results[key]?.status === 'done' && !actuallyDone) continue
         results[key] = {
-          homeScore: ht.score,
-          awayScore: at.score,
+          // Si está invertido, los scores también hay que invertirlos
+          // para que coincidan con home/away de nuestros datos
+          homeScore: reversed ? at.score : ht.score,
+          awayScore: reversed ? ht.score : at.score,
           status: actuallyDone ? 'done' : 'live',
           clock: ev.status?.displayClock ?? '',
         }
-        console.log(`[ESPN] ✓ ${htName} ${ht.score}-${at.score} ${atName} [${statusName}]`)
+        console.log(`[ESPN] ✓ ${htName} ${ht.score}-${at.score} ${atName} [${statusName}]${reversed ? ' (localía invertida)' : ''}`)
       } else {
         unmatched++
         unmatchedNames.push(`"${htName}" vs "${atName}" [${normalize(htName)} / ${normalize(atName)}]`)

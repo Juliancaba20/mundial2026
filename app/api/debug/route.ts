@@ -112,12 +112,19 @@ export async function GET() {
 
         if (classification !== 'pending' && hasScore) {
           withScore++
-          const m = BASE_MATCHES.find(m =>
+          let m = BASE_MATCHES.find(m =>
             matchTeamName(htName, m.home.name) && matchTeamName(atName, m.away.name)
           )
+          let reversed = false
+          if (!m) {
+            m = BASE_MATCHES.find(m =>
+              matchTeamName(htName, m.away.name) && matchTeamName(atName, m.home.name)
+            )
+            reversed = true
+          }
           if (m) {
             matched++
-            matchResult = 'matched'
+            matchResult = reversed ? 'matched_reversed' : 'matched'
             ourMatch = `${m.home.name} vs ${m.away.name}`
           } else {
             unmatched++
