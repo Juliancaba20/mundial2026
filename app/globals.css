@@ -599,3 +599,108 @@ button { font-family: var(--body); cursor: pointer; }
   .br-desktop { display: none; }
   .br-mobile  { display: block; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   MATCH TIME + UPDATED MATCH ROW
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Match row — layout actualizado ──────────────────────────────────────── */
+.match-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 10px 14px;
+}
+.m-main { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.m-teams { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.m-meta-row {
+  display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap; padding-left: 2px;
+}
+
+/* Restaurar layout de fila horizontal en desktop */
+@media (min-width: 600px) {
+  .match-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+  }
+  .m-main { gap: 3px; padding: 10px 0; }
+}
+
+/* Estadio */
+.m-stadium {
+  font-size: 11px; color: var(--faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 200px;
+}
+.m-stadium::before { content: '·'; margin-right: 6px; }
+
+/* ── MatchTime — estado PENDING ───────────────────────────────────────────── */
+.mt-pending {
+  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+}
+.mt-date {
+  font-size: 11px; color: var(--muted); font-weight: 500;
+  text-transform: capitalize;
+}
+.mt-sep { font-size: 11px; color: var(--faint); }
+.mt-time { font-size: 11px; color: var(--muted); font-weight: 600; }
+.mt-countdown {
+  font-size: 10px; color: var(--faint);
+  background: var(--surface2); border-radius: 6px;
+  padding: 1px 7px; font-weight: 500;
+}
+.mt-imminent {
+  color: var(--green);
+  background: var(--green-dim);
+  animation: pulse-text 2s ease-in-out infinite;
+}
+@keyframes pulse-text {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .6; }
+}
+
+/* ── MatchTime — estado LIVE ─────────────────────────────────────────────── */
+.mt-live {
+  display: flex; align-items: center; gap: 5px;
+}
+.mt-live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--red); flex-shrink: 0;
+  animation: blink 1.4s ease-in-out infinite;
+}
+.mt-live-text {
+  font-size: 10px; font-weight: 700; color: var(--red);
+  letter-spacing: .06em;
+}
+.mt-live-clock {
+  font-size: 11px; color: var(--red); font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── MatchTime — estado DONE ─────────────────────────────────────────────── */
+.mt-done {
+  display: flex; align-items: center; gap: 5px;
+}
+.mt-done-text {
+  font-size: 10px; font-weight: 500; color: var(--faint);
+  background: var(--surface2); border-radius: 6px; padding: 1px 7px;
+}
+.mt-done-date { font-size: 11px; color: var(--faint); }
+
+/* ── Match row: estado finalizado más apagado ────────────────────────────── */
+.match-row.is-done {
+  opacity: .8;
+}
+.match-row.is-done .m-tname { color: var(--muted); }
+.match-row.is-done .m-score-box { color: var(--text); font-weight: 600; }
+
+/* ── Ocultar badge derecho viejo (lo reemplaza MatchTime) ───────────────── */
+.m-right { display: none; }
+
+@media (max-width: 599px) {
+  .m-stadium { max-width: 150px; }
+  .m-group-tag { align-self: flex-start; margin-top: 10px; }
+}

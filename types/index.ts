@@ -27,12 +27,15 @@ export type MatchStatus = 'pending' | 'live' | 'done'
 
 export interface Match {
   id: string
-  date: string
-  dateSort: number
+  date: string        // "11 jun" — label de display fallback
+  dateSort: number    // 20260611 — para ordenar
+  kickoff: string     // ISO 8601 UTC — "2026-06-11T20:00:00Z" — fuente de verdad
   group: string
   home: TeamRef
   away: TeamRef
-  venue: string
+  venue: string       // "Ciudad, País" — display corto
+  stadium?: string    // nombre completo del estadio
+  city: string        // ciudad sede
   isArgentina?: boolean
   score?: string
   status: MatchStatus
@@ -42,31 +45,30 @@ export interface Match {
 // ─── Bracket ─────────────────────────────────────────────────────────────────
 
 export interface BracketSlot {
-  label: string          // "1° Grupo A" o nombre real del equipo
-  team: TeamRef | null   // null mientras no se conoce el clasificado
+  label: string
+  team: TeamRef | null
   score?: string
-  winner?: boolean       // true = ganador de este partido
+  winner?: boolean
 }
 
 export interface BracketMatch {
-  id: string             // "R32-1", "R16-1", "QF-1", "SF-1", "F", "3RD"
+  id: string
   round: BracketRound
   date: string
   home: BracketSlot
   away: BracketSlot
   status: MatchStatus
-  // índices del siguiente partido en el bracket (para dibujar líneas)
   nextMatchId?: string
   nextPosition?: 'home' | 'away'
 }
 
 export type BracketRound =
-  | 'R32'   // 16avos
-  | 'R16'   // octavos
-  | 'QF'    // cuartos
-  | 'SF'    // semis
-  | 'F'     // final
-  | '3RD'   // tercer puesto
+  | 'R32'
+  | 'R16'
+  | 'QF'
+  | 'SF'
+  | 'F'
+  | '3RD'
 
 // ─── Noticias ────────────────────────────────────────────────────────────────
 
