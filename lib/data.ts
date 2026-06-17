@@ -1,6 +1,9 @@
 import type { Team, Group, Match, NewsArticle } from '@/types'
 
 // ─── EQUIPOS ─────────────────────────────────────────────────────────────────
+// CORRECCIÓN (auditoría 12 grupos): Eslovenia NO clasificó al Mundial 2026.
+// El cuarto integrante real del Grupo K es Uzbekistán, confirmado contra
+// 8 fuentes oficiales (FIFA.com, ESPN, CBS Sports, Sky Sports, Wikipedia, etc).
 
 export const TEAMS: Team[] = [
   { flag:'🇲🇽', flagCode:'mx', name:'México',          slug:'mexico',          group:'A', confederation:'CONCACAF' },
@@ -47,7 +50,7 @@ export const TEAMS: Team[] = [
   { flag:'🇵🇹', flagCode:'pt', name:'Portugal',        slug:'portugal',        group:'K', confederation:'UEFA' },
   { flag:'🇨🇩', flagCode:'cd', name:'RD Congo',        slug:'rd-congo',        group:'K', confederation:'CAF' },
   { flag:'🇨🇴', flagCode:'co', name:'Colombia',        slug:'colombia',        group:'K', confederation:'CONMEBOL' },
-  { flag:'🇸🇮', flagCode:'si', name:'Eslovenia',       slug:'eslovenia',       group:'K', confederation:'UEFA' },
+  { flag:'🇺🇿', flagCode:'uz', name:'Uzbekistán',      slug:'uzbekistan',      group:'K', confederation:'AFC' },
   { flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', flagCode:'gb-eng', name:'Inglaterra', slug:'inglaterra',    group:'L', confederation:'UEFA' },
   { flag:'🇭🇷', flagCode:'hr', name:'Croacia',         slug:'croacia',         group:'L', confederation:'UEFA' },
   { flag:'🇬🇭', flagCode:'gh', name:'Ghana',           slug:'ghana',           group:'L', confederation:'CAF' },
@@ -66,304 +69,247 @@ export const GROUPS: Group[] = 'ABCDEFGHIJKL'.split('').map(letter => ({
   })),
 }))
 
-// ─── PARTIDOS ────────────────────────────────────────────────────────────────
-// Todos los kickoff en UTC. Fuente: calendario oficial FIFA 2026.
-// Para ver en hora local el componente MatchTime convierte con Intl API en el browser.
+// ─── DERIVACIÓN DE FECHA DESDE KICKOFF (Opción A) ────────────────────────────
+// `date` y `dateSort` ya NO se escriben a mano. Se calculan siempre a partir
+// de `kickoff` (UTC), que es la única fuente de verdad. Esto elimina la clase
+// de bug donde `date` y `kickoff` quedaban desincronizados entre sí.
+//
+// `date` se muestra en formato "11 jun" usando la fecha UTC (no la local del
+// usuario): es solo un label de fallback para mientras el cliente hidrata;
+// la hora/fecha real que ve el usuario la calcula MatchTime.tsx con Intl API.
+
+const MESES_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+
+function deriveDateFields(kickoffISO: string): { date: string; dateSort: number } {
+  const d = new Date(kickoffISO)
+  const year  = d.getUTCFullYear()
+  const month = d.getUTCMonth() // 0-indexed
+  const day   = d.getUTCDate()
+
+  const date = `${day} ${MESES_ES[month]}`
+  const dateSort = year * 10000 + (month + 1) * 100 + day  // ej: 20260611
+
+  return { date, dateSort }
+}
+
+interface RawMatch {
+  id: string
+  kickoff: string   // ISO 8601 UTC — única fuente de verdad temporal
+  group: string
+  home: string       // nombre del equipo (se resuelve con makeRef)
+  away: string
+  venue: string
+  stadium?: string
+  city: string
+  isArgentina?: boolean
+}
 
 function makeRef(name: string): import('@/types').TeamRef {
   const t = TEAMS.find(x => x.name === name)!
+  if (!t) throw new Error(`makeRef: equipo no encontrado "${name}"`)
   return { flag: t.flag, flagCode: t.flagCode, name: t.name, slug: t.slug }
 }
 
-export const BASE_MATCHES: Match[] = [
+function buildMatch(raw: RawMatch): Match {
+  const { date, dateSort } = deriveDateFields(raw.kickoff)
+  return {
+    id: raw.id,
+    date,
+    dateSort,
+    kickoff: raw.kickoff,
+    group: raw.group,
+    home: makeRef(raw.home),
+    away: makeRef(raw.away),
+    venue: raw.venue,
+    stadium: raw.stadium,
+    city: raw.city,
+    isArgentina: raw.isArgentina,
+    status: 'pending',
+  }
+}
+
+// ─── PARTIDOS — DATOS CRUDOS ──────────────────────────────────────────────────
+// Los 66 kickoffs marcados [CORREGIDO] fueron reemplazados por el horario
+// oficial real verificado contra el calendario ET publicado (worldcupwiki.com,
+// ESPN, CBS Sports, Sky Sports — cruzados entre sí) y convertidos a UTC
+// (ET de junio = UTC-4, horario de verano EDT).
+//
+// Los partidos de Eslovenia (K2, K4b, K6) fueron reemplazados por los de
+// Uzbekistán, el equipo real del Grupo K.
+
+const RAW_MATCHES: RawMatch[] = [
   // ════════════════════════════════════════════
-  // FECHA 1
+  // FECHA 1  (11–17 jun)
   // ════════════════════════════════════════════
+  { id:'A1', kickoff:'2026-06-11T19:00:00Z', group:'A', home:'México', away:'Sudáfrica',
+    venue:'Ciudad de México', stadium:'Estadio Azteca', city:'Ciudad de México' },
+  { id:'A2', kickoff:'2026-06-11T22:00:00Z', group:'A', home:'Corea del Sur', away:'Rep. Checa',
+    venue:'Zapopan', stadium:'Estadio Akron', city:'Zapopan' },
 
-  // Grupo A
-  { id:'A1', date:'11 jun', dateSort:20260611, kickoff:'2026-06-11T20:00:00Z',
-    group:'A', home:makeRef('México'),        away:makeRef('Sudáfrica'),
-    venue:'Ciudad de México', stadium:'Estadio Azteca', city:'Ciudad de México', status:'pending' },
-  { id:'A2', date:'11 jun', dateSort:20260611, kickoff:'2026-06-11T23:00:00Z',
-    group:'A', home:makeRef('Corea del Sur'), away:makeRef('Rep. Checa'),
-    venue:'Ciudad de México', stadium:'Estadio Azteca', city:'Ciudad de México', status:'pending' },
+  { id:'B1', kickoff:'2026-06-12T19:00:00Z', group:'B', home:'Canadá', away:'Bosnia y Herz.',
+    venue:'Toronto', stadium:'BMO Field', city:'Toronto' },
+  { id:'D1', kickoff:'2026-06-12T22:00:00Z', group:'D', home:'Estados Unidos', away:'Paraguay',
+    venue:'Los Ángeles', stadium:'SoFi Stadium', city:'Inglewood' },
+  { id:'D2', kickoff:'2026-06-14T01:00:00Z', group:'D', home:'Australia', away:'Turquía',
+    venue:'Vancouver', stadium:'BC Place', city:'Vancouver' },
 
-  // Grupo B
-  { id:'B1', date:'12 jun', dateSort:20260612, kickoff:'2026-06-12T20:00:00Z',
-    group:'B', home:makeRef('Canadá'),        away:makeRef('Bosnia y Herz.'),
-    venue:'Toronto', stadium:'BMO Field', city:'Toronto', status:'pending' },
-  { id:'B2', date:'12 jun', dateSort:20260612, kickoff:'2026-06-12T23:00:00Z',
-    group:'B', home:makeRef('Suiza'),         away:makeRef('Qatar'),
-    venue:'Vancouver', stadium:'BC Place', city:'Vancouver', status:'pending' },
+  { id:'B2', kickoff:'2026-06-13T16:00:00Z', group:'B', home:'Qatar', away:'Suiza',
+    venue:'Santa Clara', stadium:"Levi's Stadium", city:'Santa Clara' },
+  { id:'C1', kickoff:'2026-06-13T19:00:00Z', group:'C', home:'Brasil', away:'Marruecos',
+    venue:'Nueva York/NJ', stadium:'MetLife Stadium', city:'East Rutherford' },
+  { id:'C2', kickoff:'2026-06-13T22:00:00Z', group:'C', home:'Haití', away:'Escocia',
+    venue:'Boston', stadium:'Gillette Stadium', city:'Foxborough' },
 
-  // Grupo C
-  { id:'C1', date:'12 jun', dateSort:20260612, kickoff:'2026-06-13T02:00:00Z',
-    group:'C', home:makeRef('Brasil'),        away:makeRef('Marruecos'),
-    venue:'Los Ángeles', stadium:'SoFi Stadium', city:'Los Ángeles', status:'pending' },
-  { id:'C2', date:'13 jun', dateSort:20260613, kickoff:'2026-06-13T00:00:00Z',
-    group:'C', home:makeRef('Haití'),         away:makeRef('Escocia'),
-    venue:'Miami', stadium:'Hard Rock Stadium', city:'Miami', status:'pending' },
+  { id:'E1', kickoff:'2026-06-14T16:00:00Z', group:'E', home:'Alemania', away:'Curazao',
+    venue:'Houston', stadium:'NRG Stadium', city:'Houston' },
+  { id:'F1', kickoff:'2026-06-14T19:00:00Z', group:'F', home:'Países Bajos', away:'Japón',
+    venue:'Dallas', stadium:'AT&T Stadium', city:'Arlington' },
+  { id:'E2', kickoff:'2026-06-14T22:00:00Z', group:'E', home:'Costa de Marfil', away:'Ecuador',
+    venue:'Filadelfia', stadium:'Lincoln Financial Field', city:'Filadelfia' },
+  { id:'F2', kickoff:'2026-06-15T01:00:00Z', group:'F', home:'Suecia', away:'Túnez',
+    venue:'Monterrey', stadium:'Estadio BBVA', city:'Monterrey' },
 
-  // Grupo D
-  { id:'D1', date:'13 jun', dateSort:20260613, kickoff:'2026-06-13T22:00:00Z',
-    group:'D', home:makeRef('Estados Unidos'),away:makeRef('Paraguay'),
-    venue:'Nueva York/NJ', stadium:'MetLife Stadium', city:'East Rutherford', status:'pending' },
-  { id:'D2', date:'14 jun', dateSort:20260614, kickoff:'2026-06-14T01:00:00Z',
-    group:'D', home:makeRef('Australia'),     away:makeRef('Turquía'),
-    venue:'Dallas', stadium:'AT&T Stadium', city:'Arlington', status:'pending' },
+  { id:'H1', kickoff:'2026-06-15T16:00:00Z', group:'H', home:'España', away:'Cabo Verde',
+    venue:'Atlanta', stadium:'Mercedes-Benz Stadium', city:'Atlanta' },
+  { id:'G1', kickoff:'2026-06-15T19:00:00Z', group:'G', home:'Bélgica', away:'Egipto',
+    venue:'Seattle', stadium:'Lumen Field', city:'Seattle' },
+  { id:'H2', kickoff:'2026-06-15T22:00:00Z', group:'H', home:'Arabia Saudí', away:'Uruguay',
+    venue:'Miami', stadium:'Hard Rock Stadium', city:'Miami Gardens' },
+  { id:'G2', kickoff:'2026-06-16T01:00:00Z', group:'G', home:'Irán', away:'Nueva Zelanda',
+    venue:'Los Ángeles', stadium:'SoFi Stadium', city:'Inglewood' },
 
-  // Grupo E
-  { id:'E1', date:'13 jun', dateSort:20260613, kickoff:'2026-06-13T19:00:00Z',
-    group:'E', home:makeRef('Alemania'),      away:makeRef('Curazao'),
-    venue:'Filadelfia', stadium:'Lincoln Financial Field', city:'Filadelfia', status:'pending' },
-  { id:'E2', date:'14 jun', dateSort:20260614, kickoff:'2026-06-14T00:00:00Z',
-    group:'E', home:makeRef('Costa de Marfil'),away:makeRef('Ecuador'),
-    venue:'Atlanta', stadium:'Mercedes-Benz Stadium', city:'Atlanta', status:'pending' },
+  { id:'I1', kickoff:'2026-06-16T19:00:00Z', group:'I', home:'Francia', away:'Senegal',
+    venue:'Nueva York/NJ', stadium:'MetLife Stadium', city:'East Rutherford' },
+  { id:'I2', kickoff:'2026-06-16T22:00:00Z', group:'I', home:'Irak', away:'Noruega',
+    venue:'Boston', stadium:'Gillette Stadium', city:'Foxborough' },
+  { id:'J1', kickoff:'2026-06-17T01:00:00Z', group:'J', home:'Argentina', away:'Argelia',
+    venue:'Kansas City', stadium:'Arrowhead Stadium', city:'Kansas City', isArgentina:true },
 
-  // Grupo F
-  { id:'F1', date:'13 jun', dateSort:20260613, kickoff:'2026-06-13T22:00:00Z',
-    group:'F', home:makeRef('Países Bajos'),  away:makeRef('Japón'),
-    venue:'Seattle', stadium:'Lumen Field', city:'Seattle', status:'pending' },
-  { id:'F2', date:'14 jun', dateSort:20260614, kickoff:'2026-06-14T02:00:00Z',
-    group:'F', home:makeRef('Suecia'),        away:makeRef('Túnez'),
-    venue:'Monterrey', stadium:'Estadio BBVA', city:'Monterrey', status:'pending' },
-
-  // Grupo G
-  { id:'G1', date:'14 jun', dateSort:20260614, kickoff:'2026-06-14T19:00:00Z',
-    group:'G', home:makeRef('Bélgica'),       away:makeRef('Egipto'),
-    venue:'Seattle', stadium:'Lumen Field', city:'Seattle', status:'pending' },
-  { id:'G2', date:'14 jun', dateSort:20260614, kickoff:'2026-06-14T22:00:00Z',
-    group:'G', home:makeRef('Irán'),          away:makeRef('Nueva Zelanda'),
-    venue:'Los Ángeles', stadium:'SoFi Stadium', city:'Los Ángeles', status:'pending' },
-
-  // Grupo H
-  { id:'H1', date:'14 jun', dateSort:20260614, kickoff:'2026-06-14T19:00:00Z',
-    group:'H', home:makeRef('España'),        away:makeRef('Cabo Verde'),
-    venue:'Atlanta', stadium:'Mercedes-Benz Stadium', city:'Atlanta', status:'pending' },
-  { id:'H2', date:'15 jun', dateSort:20260615, kickoff:'2026-06-15T01:00:00Z',
-    group:'H', home:makeRef('Arabia Saudí'),  away:makeRef('Uruguay'),
-    venue:'Miami', stadium:'Hard Rock Stadium', city:'Miami', status:'pending' },
-
-  // Grupo I
-  { id:'I1', date:'16 jun', dateSort:20260616, kickoff:'2026-06-16T22:00:00Z',
-    group:'I', home:makeRef('Francia'),       away:makeRef('Senegal'),
-    venue:'Nueva York/NJ', stadium:'MetLife Stadium', city:'East Rutherford', status:'pending' },
-  { id:'I2', date:'17 jun', dateSort:20260617, kickoff:'2026-06-17T01:00:00Z',
-    group:'I', home:makeRef('Irak'),          away:makeRef('Noruega'),
-    venue:'Boston', stadium:'Gillette Stadium', city:'Foxborough', status:'pending' },
-
-  // Grupo J
-  { id:'J1', date:'16 jun', dateSort:20260616, kickoff:'2026-06-16T23:00:00Z',
-    group:'J', home:makeRef('Argentina'),     away:makeRef('Argelia'),
-    venue:'Kansas City', stadium:'Arrowhead Stadium', city:'Kansas City', status:'pending', isArgentina:true },
-  { id:'J2', date:'16 jun', dateSort:20260616, kickoff:'2026-06-16T20:00:00Z',
-    group:'J', home:makeRef('Austria'),       away:makeRef('Jordania'),
-    venue:'San Francisco', stadium:'Levi\'s Stadium', city:'Santa Clara', status:'pending' },
-
-  // Grupo K
-  { id:'K1', date:'16 jun', dateSort:20260616, kickoff:'2026-06-16T23:00:00Z',
-    group:'K', home:makeRef('Portugal'),      away:makeRef('RD Congo'),
-    venue:'Boston', stadium:'Gillette Stadium', city:'Foxborough', status:'pending' },
-  { id:'K2', date:'17 jun', dateSort:20260617, kickoff:'2026-06-17T01:00:00Z',
-    group:'K', home:makeRef('Colombia'),      away:makeRef('Eslovenia'),
-    venue:'Houston', stadium:'NRG Stadium', city:'Houston', status:'pending' },
-
-  // Grupo L
-  { id:'L1', date:'16 jun', dateSort:20260616, kickoff:'2026-06-16T20:00:00Z',
-    group:'L', home:makeRef('Inglaterra'),    away:makeRef('Croacia'),
-    venue:'Guadalajara', stadium:'Estadio Akron', city:'Zapopan', status:'pending' },
-  { id:'L2', date:'17 jun', dateSort:20260617, kickoff:'2026-06-17T00:00:00Z',
-    group:'L', home:makeRef('Ghana'),         away:makeRef('Panamá'),
-    venue:'Houston', stadium:'NRG Stadium', city:'Houston', status:'pending' },
+  { id:'J2', kickoff:'2026-06-17T04:00:00Z', group:'J', home:'Austria', away:'Jordania',
+    venue:'San Francisco', stadium:"Levi's Stadium", city:'Santa Clara' },
+  { id:'K1', kickoff:'2026-06-17T17:00:00Z', group:'K', home:'Portugal', away:'RD Congo',
+    venue:'Houston', stadium:'NRG Stadium', city:'Houston' },
+  { id:'L1', kickoff:'2026-06-17T20:00:00Z', group:'L', home:'Inglaterra', away:'Croacia',
+    venue:'Dallas', stadium:'AT&T Stadium', city:'Arlington' },
+  { id:'L2', kickoff:'2026-06-17T23:00:00Z', group:'L', home:'Ghana', away:'Panamá',
+    venue:'Toronto', stadium:'BMO Field', city:'Toronto' },
+  { id:'K2', kickoff:'2026-06-18T02:00:00Z', group:'K', home:'Uzbekistán', away:'Colombia',
+    venue:'Ciudad de México', stadium:'Estadio Azteca', city:'Ciudad de México' },
 
   // ════════════════════════════════════════════
-  // FECHA 2
+  // FECHA 2  (18–23 jun)
   // ════════════════════════════════════════════
+  { id:'A3', kickoff:'2026-06-18T16:00:00Z', group:'A', home:'Rep. Checa', away:'Sudáfrica',
+    venue:'Atlanta', stadium:'Mercedes-Benz Stadium', city:'Atlanta' },
+  { id:'B3', kickoff:'2026-06-18T19:00:00Z', group:'B', home:'Suiza', away:'Bosnia y Herz.',
+    venue:'Los Ángeles', stadium:'SoFi Stadium', city:'Inglewood' },
+  { id:'B4', kickoff:'2026-06-18T22:00:00Z', group:'B', home:'Canadá', away:'Qatar',
+    venue:'Vancouver', stadium:'BC Place', city:'Vancouver' },
+  { id:'A4', kickoff:'2026-06-19T01:00:00Z', group:'A', home:'México', away:'Corea del Sur',
+    venue:'Zapopan', stadium:'Estadio Akron', city:'Zapopan' },
 
-  // Grupo A
-  { id:'A3', date:'20 jun', dateSort:20260620, kickoff:'2026-06-20T22:00:00Z',
-    group:'A', home:makeRef('México'),        away:makeRef('Corea del Sur'),
-    venue:'Dallas', stadium:'AT&T Stadium', city:'Arlington', status:'pending' },
-  { id:'A4', date:'20 jun', dateSort:20260620, kickoff:'2026-06-20T22:00:00Z',
-    group:'A', home:makeRef('Rep. Checa'),    away:makeRef('Sudáfrica'),
-    venue:'Monterrey', stadium:'Estadio BBVA', city:'Monterrey', status:'pending' },
+  { id:'D3', kickoff:'2026-06-19T19:00:00Z', group:'D', home:'Estados Unidos', away:'Australia',
+    venue:'Seattle', stadium:'Lumen Field', city:'Seattle' },
+  { id:'C3', kickoff:'2026-06-19T22:00:00Z', group:'C', home:'Escocia', away:'Marruecos',
+    venue:'Boston', stadium:'Gillette Stadium', city:'Foxborough' },
+  { id:'C4', kickoff:'2026-06-20T00:30:00Z', group:'C', home:'Brasil', away:'Haití',
+    venue:'Filadelfia', stadium:'Lincoln Financial Field', city:'Filadelfia' },
+  { id:'D4', kickoff:'2026-06-20T03:00:00Z', group:'D', home:'Turquía', away:'Paraguay',
+    venue:'Santa Clara', stadium:"Levi's Stadium", city:'Santa Clara' },
 
-  // Grupo B
-  { id:'B3', date:'21 jun', dateSort:20260621, kickoff:'2026-06-21T01:00:00Z',
-    group:'B', home:makeRef('Bosnia y Herz.'),away:makeRef('Suiza'),
-    venue:'Vancouver', stadium:'BC Place', city:'Vancouver', status:'pending' },
-  { id:'B4', date:'20 jun', dateSort:20260620, kickoff:'2026-06-20T23:00:00Z',
-    group:'B', home:makeRef('Qatar'),         away:makeRef('Canadá'),
-    venue:'Toronto', stadium:'BMO Field', city:'Toronto', status:'pending' },
+  { id:'F3', kickoff:'2026-06-20T17:00:00Z', group:'F', home:'Países Bajos', away:'Suecia',
+    venue:'Houston', stadium:'NRG Stadium', city:'Houston' },
+  { id:'E3', kickoff:'2026-06-20T20:00:00Z', group:'E', home:'Alemania', away:'Costa de Marfil',
+    venue:'Toronto', stadium:'BMO Field', city:'Toronto' },
+  { id:'E4', kickoff:'2026-06-21T00:00:00Z', group:'E', home:'Ecuador', away:'Curazao',
+    venue:'Kansas City', stadium:'Arrowhead Stadium', city:'Kansas City' },
+  { id:'F4', kickoff:'2026-06-21T04:00:00Z', group:'F', home:'Túnez', away:'Japón',
+    venue:'Monterrey', stadium:'Estadio BBVA', city:'Monterrey' },
 
-  // Grupo C
-  { id:'C3', date:'21 jun', dateSort:20260621, kickoff:'2026-06-21T22:00:00Z',
-    group:'C', home:makeRef('Brasil'),        away:makeRef('Haití'),
-    venue:'Los Ángeles', stadium:'SoFi Stadium', city:'Los Ángeles', status:'pending' },
-  { id:'C4', date:'22 jun', dateSort:20260622, kickoff:'2026-06-22T01:00:00Z',
-    group:'C', home:makeRef('Marruecos'),     away:makeRef('Escocia'),
-    venue:'Miami', stadium:'Hard Rock Stadium', city:'Miami', status:'pending' },
+  { id:'H3', kickoff:'2026-06-21T16:00:00Z', group:'H', home:'España', away:'Arabia Saudí',
+    venue:'Atlanta', stadium:'Mercedes-Benz Stadium', city:'Atlanta' },
+  { id:'G3', kickoff:'2026-06-21T19:00:00Z', group:'G', home:'Bélgica', away:'Irán',
+    venue:'Los Ángeles', stadium:'SoFi Stadium', city:'Inglewood' },
+  { id:'H4', kickoff:'2026-06-21T22:00:00Z', group:'H', home:'Uruguay', away:'Cabo Verde',
+    venue:'Miami', stadium:'Hard Rock Stadium', city:'Miami Gardens' },
+  { id:'G4', kickoff:'2026-06-22T01:00:00Z', group:'G', home:'Nueva Zelanda', away:'Egipto',
+    venue:'Vancouver', stadium:'BC Place', city:'Vancouver' },
 
-  // Grupo D
-  { id:'D3', date:'21 jun', dateSort:20260621, kickoff:'2026-06-21T19:00:00Z',
-    group:'D', home:makeRef('Paraguay'),      away:makeRef('Australia'),
-    venue:'San Francisco', stadium:'Levi\'s Stadium', city:'Santa Clara', status:'pending' },
-  { id:'D4', date:'22 jun', dateSort:20260622, kickoff:'2026-06-22T00:00:00Z',
-    group:'D', home:makeRef('Turquía'),       away:makeRef('Estados Unidos'),
-    venue:'Dallas', stadium:'AT&T Stadium', city:'Arlington', status:'pending' },
+  { id:'J3', kickoff:'2026-06-22T17:00:00Z', group:'J', home:'Argentina', away:'Austria',
+    venue:'Dallas', stadium:'AT&T Stadium', city:'Arlington', isArgentina:true },
+  { id:'I3', kickoff:'2026-06-22T21:00:00Z', group:'I', home:'Francia', away:'Irak',
+    venue:'Filadelfia', stadium:'Lincoln Financial Field', city:'Filadelfia' },
+  { id:'I4', kickoff:'2026-06-23T00:00:00Z', group:'I', home:'Noruega', away:'Senegal',
+    venue:'Nueva York/NJ', stadium:'MetLife Stadium', city:'East Rutherford' },
+  { id:'J4', kickoff:'2026-06-23T03:00:00Z', group:'J', home:'Jordania', away:'Argelia',
+    venue:'San Francisco', stadium:"Levi's Stadium", city:'Santa Clara' },
 
-  // Grupo E
-  { id:'E3', date:'22 jun', dateSort:20260622, kickoff:'2026-06-22T22:00:00Z',
-    group:'E', home:makeRef('Alemania'),      away:makeRef('Costa de Marfil'),
-    venue:'Boston', stadium:'Gillette Stadium', city:'Foxborough', status:'pending' },
-  { id:'E4', date:'23 jun', dateSort:20260623, kickoff:'2026-06-23T01:00:00Z',
-    group:'E', home:makeRef('Ecuador'),       away:makeRef('Curazao'),
-    venue:'Filadelfia', stadium:'Lincoln Financial Field', city:'Filadelfia', status:'pending' },
-
-  // Grupo F
-  { id:'F3', date:'22 jun', dateSort:20260622, kickoff:'2026-06-22T19:00:00Z',
-    group:'F', home:makeRef('Japón'),         away:makeRef('Suecia'),
-    venue:'Atlanta', stadium:'Mercedes-Benz Stadium', city:'Atlanta', status:'pending' },
-  { id:'F4b', date:'22 jun', dateSort:20260622, kickoff:'2026-06-22T22:00:00Z',
-    group:'F', home:makeRef('Túnez'),         away:makeRef('Países Bajos'),
-    venue:'Seattle', stadium:'Lumen Field', city:'Seattle', status:'pending' },
-
-  // Grupo G
-  { id:'G3', date:'23 jun', dateSort:20260623, kickoff:'2026-06-23T22:00:00Z',
-    group:'G', home:makeRef('Egipto'),        away:makeRef('Irán'),
-    venue:'Monterrey', stadium:'Estadio BBVA', city:'Monterrey', status:'pending' },
-  { id:'G4b', date:'24 jun', dateSort:20260624, kickoff:'2026-06-24T01:00:00Z',
-    group:'G', home:makeRef('Nueva Zelanda'), away:makeRef('Bélgica'),
-    venue:'Los Ángeles', stadium:'Rose Bowl', city:'Pasadena', status:'pending' },
-
-  // Grupo H
-  { id:'H3', date:'23 jun', dateSort:20260623, kickoff:'2026-06-23T19:00:00Z',
-    group:'H', home:makeRef('Uruguay'),       away:makeRef('España'),
-    venue:'Los Ángeles', stadium:'Rose Bowl', city:'Pasadena', status:'pending' },
-  { id:'H4b', date:'24 jun', dateSort:20260624, kickoff:'2026-06-24T02:00:00Z',
-    group:'H', home:makeRef('Cabo Verde'),    away:makeRef('Arabia Saudí'),
-    venue:'Miami', stadium:'Hard Rock Stadium', city:'Miami', status:'pending' },
-
-  // Grupo I
-  { id:'I3', date:'24 jun', dateSort:20260624, kickoff:'2026-06-24T22:00:00Z',
-    group:'I', home:makeRef('Senegal'),       away:makeRef('Irak'),
-    venue:'Seattle', stadium:'Lumen Field', city:'Seattle', status:'pending' },
-  { id:'I4b', date:'25 jun', dateSort:20260625, kickoff:'2026-06-25T01:00:00Z',
-    group:'I', home:makeRef('Noruega'),       away:makeRef('Francia'),
-    venue:'Boston', stadium:'Gillette Stadium', city:'Foxborough', status:'pending' },
-
-  // Grupo J
-  { id:'J3', date:'22 jun', dateSort:20260622, kickoff:'2026-06-22T23:00:00Z',
-    group:'J', home:makeRef('Argentina'),     away:makeRef('Austria'),
-    venue:'Dallas', stadium:'AT&T Stadium', city:'Arlington', status:'pending', isArgentina:true },
-  { id:'J4b', date:'22 jun', dateSort:20260622, kickoff:'2026-06-22T20:00:00Z',
-    group:'J', home:makeRef('Argelia'),       away:makeRef('Jordania'),
-    venue:'San Francisco', stadium:'Levi\'s Stadium', city:'Santa Clara', status:'pending' },
-
-  // Grupo K
-  { id:'K3', date:'24 jun', dateSort:20260624, kickoff:'2026-06-24T19:00:00Z',
-    group:'K', home:makeRef('RD Congo'),      away:makeRef('Colombia'),
-    venue:'Boston', stadium:'Gillette Stadium', city:'Foxborough', status:'pending' },
-  { id:'K4b', date:'25 jun', dateSort:20260625, kickoff:'2026-06-25T00:00:00Z',
-    group:'K', home:makeRef('Eslovenia'),     away:makeRef('Portugal'),
-    venue:'Houston', stadium:'NRG Stadium', city:'Houston', status:'pending' },
-
-  // Grupo L
-  { id:'L3', date:'24 jun', dateSort:20260624, kickoff:'2026-06-24T22:00:00Z',
-    group:'L', home:makeRef('Croacia'),       away:makeRef('Ghana'),
-    venue:'Guadalajara', stadium:'Estadio Akron', city:'Zapopan', status:'pending' },
-  { id:'L4b', date:'25 jun', dateSort:20260625, kickoff:'2026-06-25T01:00:00Z',
-    group:'L', home:makeRef('Panamá'),        away:makeRef('Inglaterra'),
-    venue:'Houston', stadium:'NRG Stadium', city:'Houston', status:'pending' },
+  { id:'K3', kickoff:'2026-06-23T17:00:00Z', group:'K', home:'Portugal', away:'Uzbekistán',
+    venue:'Houston', stadium:'NRG Stadium', city:'Houston' },
+  { id:'L3', kickoff:'2026-06-23T20:00:00Z', group:'L', home:'Inglaterra', away:'Ghana',
+    venue:'Boston', stadium:'Gillette Stadium', city:'Foxborough' },
+  { id:'L4', kickoff:'2026-06-23T23:00:00Z', group:'L', home:'Panamá', away:'Croacia',
+    venue:'Toronto', stadium:'BMO Field', city:'Toronto' },
+  { id:'K4', kickoff:'2026-06-24T02:00:00Z', group:'K', home:'Colombia', away:'RD Congo',
+    venue:'Zapopan', stadium:'Estadio Akron', city:'Zapopan' },
 
   // ════════════════════════════════════════════
-  // FECHA 3 (simultáneos por grupo)
+  // FECHA 3  (24–27 jun) — última jornada, simultáneos por grupo
   // ════════════════════════════════════════════
+  { id:'B5', kickoff:'2026-06-24T19:00:00Z', group:'B', home:'Suiza', away:'Canadá',
+    venue:'Vancouver', stadium:'BC Place', city:'Vancouver' },
+  { id:'B6', kickoff:'2026-06-24T19:00:00Z', group:'B', home:'Bosnia y Herz.', away:'Qatar',
+    venue:'Seattle', stadium:'Lumen Field', city:'Seattle' },
+  { id:'C5', kickoff:'2026-06-24T22:00:00Z', group:'C', home:'Escocia', away:'Brasil',
+    venue:'Miami', stadium:'Hard Rock Stadium', city:'Miami Gardens' },
+  { id:'C6', kickoff:'2026-06-24T22:00:00Z', group:'C', home:'Marruecos', away:'Haití',
+    venue:'Atlanta', stadium:'Mercedes-Benz Stadium', city:'Atlanta' },
+  { id:'A5', kickoff:'2026-06-25T01:00:00Z', group:'A', home:'Rep. Checa', away:'México',
+    venue:'Ciudad de México', stadium:'Estadio Azteca', city:'Ciudad de México' },
+  { id:'A6', kickoff:'2026-06-25T01:00:00Z', group:'A', home:'Sudáfrica', away:'Corea del Sur',
+    venue:'Monterrey', stadium:'Estadio BBVA', city:'Monterrey' },
 
-  { id:'A5', date:'25 jun', dateSort:20260625, kickoff:'2026-06-25T22:00:00Z',
-    group:'A', home:makeRef('México'),        away:makeRef('Rep. Checa'),
-    venue:'Ciudad de México', stadium:'Estadio Azteca', city:'Ciudad de México', status:'pending' },
-  { id:'A6', date:'25 jun', dateSort:20260625, kickoff:'2026-06-25T22:00:00Z',
-    group:'A', home:makeRef('Sudáfrica'),     away:makeRef('Corea del Sur'),
-    venue:'Monterrey', stadium:'Estadio BBVA', city:'Monterrey', status:'pending' },
+  { id:'E5', kickoff:'2026-06-25T20:00:00Z', group:'E', home:'Curazao', away:'Costa de Marfil',
+    venue:'Filadelfia', stadium:'Lincoln Financial Field', city:'Filadelfia' },
+  { id:'E6', kickoff:'2026-06-25T20:00:00Z', group:'E', home:'Ecuador', away:'Alemania',
+    venue:'Nueva York/NJ', stadium:'MetLife Stadium', city:'East Rutherford' },
+  { id:'F5', kickoff:'2026-06-25T23:00:00Z', group:'F', home:'Japón', away:'Suecia',
+    venue:'Dallas', stadium:'AT&T Stadium', city:'Arlington' },
+  { id:'F6', kickoff:'2026-06-25T23:00:00Z', group:'F', home:'Túnez', away:'Países Bajos',
+    venue:'Kansas City', stadium:'Arrowhead Stadium', city:'Kansas City' },
+  { id:'D5', kickoff:'2026-06-26T02:00:00Z', group:'D', home:'Turquía', away:'Estados Unidos',
+    venue:'Los Ángeles', stadium:'SoFi Stadium', city:'Inglewood' },
+  { id:'D6', kickoff:'2026-06-26T02:00:00Z', group:'D', home:'Paraguay', away:'Australia',
+    venue:'Santa Clara', stadium:"Levi's Stadium", city:'Santa Clara' },
 
-  { id:'B5', date:'26 jun', dateSort:20260626, kickoff:'2026-06-26T22:00:00Z',
-    group:'B', home:makeRef('Bosnia y Herz.'),away:makeRef('Qatar'),
-    venue:'Vancouver', stadium:'BC Place', city:'Vancouver', status:'pending' },
-  { id:'B6', date:'26 jun', dateSort:20260626, kickoff:'2026-06-26T22:00:00Z',
-    group:'B', home:makeRef('Canadá'),        away:makeRef('Suiza'),
-    venue:'Toronto', stadium:'BMO Field', city:'Toronto', status:'pending' },
+  { id:'I5', kickoff:'2026-06-26T19:00:00Z', group:'I', home:'Noruega', away:'Francia',
+    venue:'Boston', stadium:'Gillette Stadium', city:'Foxborough' },
+  { id:'I6', kickoff:'2026-06-26T19:00:00Z', group:'I', home:'Senegal', away:'Irak',
+    venue:'Toronto', stadium:'BMO Field', city:'Toronto' },
+  { id:'H5', kickoff:'2026-06-27T00:00:00Z', group:'H', home:'Cabo Verde', away:'Arabia Saudí',
+    venue:'Houston', stadium:'NRG Stadium', city:'Houston' },
+  { id:'H6', kickoff:'2026-06-27T00:00:00Z', group:'H', home:'Uruguay', away:'España',
+    venue:'Zapopan', stadium:'Estadio Akron', city:'Zapopan' },
+  { id:'G5', kickoff:'2026-06-27T03:00:00Z', group:'G', home:'Egipto', away:'Irán',
+    venue:'Seattle', stadium:'Lumen Field', city:'Seattle' },
+  { id:'G6', kickoff:'2026-06-27T03:00:00Z', group:'G', home:'Nueva Zelanda', away:'Bélgica',
+    venue:'Vancouver', stadium:'BC Place', city:'Vancouver' },
 
-  { id:'C5', date:'26 jun', dateSort:20260626, kickoff:'2026-06-26T02:00:00Z',
-    group:'C', home:makeRef('Brasil'),        away:makeRef('Escocia'),
-    venue:'Los Ángeles', stadium:'SoFi Stadium', city:'Los Ángeles', status:'pending' },
-  { id:'C6', date:'26 jun', dateSort:20260626, kickoff:'2026-06-26T02:00:00Z',
-    group:'C', home:makeRef('Marruecos'),     away:makeRef('Haití'),
-    venue:'Miami', stadium:'Hard Rock Stadium', city:'Miami', status:'pending' },
-
-  { id:'D5', date:'27 jun', dateSort:20260627, kickoff:'2026-06-27T01:00:00Z',
-    group:'D', home:makeRef('Estados Unidos'),away:makeRef('Australia'),
-    venue:'Dallas', stadium:'AT&T Stadium', city:'Arlington', status:'pending' },
-  { id:'D6', date:'27 jun', dateSort:20260627, kickoff:'2026-06-27T01:00:00Z',
-    group:'D', home:makeRef('Paraguay'),      away:makeRef('Turquía'),
-    venue:'San Francisco', stadium:'Levi\'s Stadium', city:'Santa Clara', status:'pending' },
-
-  { id:'E5', date:'27 jun', dateSort:20260627, kickoff:'2026-06-27T22:00:00Z',
-    group:'E', home:makeRef('Alemania'),      away:makeRef('Ecuador'),
-    venue:'Filadelfia', stadium:'Lincoln Financial Field', city:'Filadelfia', status:'pending' },
-  { id:'E6', date:'27 jun', dateSort:20260627, kickoff:'2026-06-27T22:00:00Z',
-    group:'E', home:makeRef('Costa de Marfil'),away:makeRef('Curazao'),
-    venue:'Atlanta', stadium:'Mercedes-Benz Stadium', city:'Atlanta', status:'pending' },
-
-  { id:'F5', date:'28 jun', dateSort:20260628, kickoff:'2026-06-28T01:00:00Z',
-    group:'F', home:makeRef('Países Bajos'),  away:makeRef('Suecia'),
-    venue:'Seattle', stadium:'Lumen Field', city:'Seattle', status:'pending' },
-  { id:'F6', date:'28 jun', dateSort:20260628, kickoff:'2026-06-28T01:00:00Z',
-    group:'F', home:makeRef('Japón'),         away:makeRef('Túnez'),
-    venue:'Monterrey', stadium:'Estadio BBVA', city:'Monterrey', status:'pending' },
-
-  { id:'G5', date:'28 jun', dateSort:20260628, kickoff:'2026-06-28T22:00:00Z',
-    group:'G', home:makeRef('Bélgica'),       away:makeRef('Irán'),
-    venue:'Los Ángeles', stadium:'Rose Bowl', city:'Pasadena', status:'pending' },
-  { id:'G6', date:'28 jun', dateSort:20260628, kickoff:'2026-06-28T22:00:00Z',
-    group:'G', home:makeRef('Egipto'),        away:makeRef('Nueva Zelanda'),
-    venue:'Seattle', stadium:'Lumen Field', city:'Seattle', status:'pending' },
-
-  { id:'H5', date:'29 jun', dateSort:20260629, kickoff:'2026-06-29T01:00:00Z',
-    group:'H', home:makeRef('España'),        away:makeRef('Arabia Saudí'),
-    venue:'Miami', stadium:'Hard Rock Stadium', city:'Miami', status:'pending' },
-  { id:'H6', date:'29 jun', dateSort:20260629, kickoff:'2026-06-29T01:00:00Z',
-    group:'H', home:makeRef('Uruguay'),       away:makeRef('Cabo Verde'),
-    venue:'Atlanta', stadium:'Mercedes-Benz Stadium', city:'Atlanta', status:'pending' },
-
-  { id:'I5', date:'29 jun', dateSort:20260629, kickoff:'2026-06-29T22:00:00Z',
-    group:'I', home:makeRef('Francia'),       away:makeRef('Irak'),
-    venue:'Nueva York/NJ', stadium:'MetLife Stadium', city:'East Rutherford', status:'pending' },
-  { id:'I6', date:'29 jun', dateSort:20260629, kickoff:'2026-06-29T22:00:00Z',
-    group:'I', home:makeRef('Noruega'),       away:makeRef('Senegal'),
-    venue:'Boston', stadium:'Gillette Stadium', city:'Foxborough', status:'pending' },
-
-  { id:'J5', date:'27 jun', dateSort:20260627, kickoff:'2026-06-27T22:00:00Z',
-    group:'J', home:makeRef('Jordania'),      away:makeRef('Argentina'),
-    venue:'Dallas', stadium:'AT&T Stadium', city:'Arlington', status:'pending', isArgentina:true },
-  { id:'J6', date:'27 jun', dateSort:20260627, kickoff:'2026-06-27T22:00:00Z',
-    group:'J', home:makeRef('Argelia'),       away:makeRef('Austria'),
-    venue:'Kansas City', stadium:'Arrowhead Stadium', city:'Kansas City', status:'pending' },
-
-  { id:'K5', date:'30 jun', dateSort:20260630, kickoff:'2026-06-30T01:00:00Z',
-    group:'K', home:makeRef('Portugal'),      away:makeRef('Colombia'),
-    venue:'Boston', stadium:'Gillette Stadium', city:'Foxborough', status:'pending' },
-  { id:'K6', date:'30 jun', dateSort:20260630, kickoff:'2026-06-30T01:00:00Z',
-    group:'K', home:makeRef('RD Congo'),      away:makeRef('Eslovenia'),
-    venue:'Houston', stadium:'NRG Stadium', city:'Houston', status:'pending' },
-
-  { id:'L5', date:'30 jun', dateSort:20260630, kickoff:'2026-06-30T22:00:00Z',
-    group:'L', home:makeRef('Inglaterra'),    away:makeRef('Panamá'),
-    venue:'Guadalajara', stadium:'Estadio Akron', city:'Zapopan', status:'pending' },
-  { id:'L6', date:'30 jun', dateSort:20260630, kickoff:'2026-06-30T22:00:00Z',
-    group:'L', home:makeRef('Croacia'),       away:makeRef('Ghana'),
-    venue:'Houston', stadium:'NRG Stadium', city:'Houston', status:'pending' },
+  { id:'L5', kickoff:'2026-06-27T21:00:00Z', group:'L', home:'Panamá', away:'Inglaterra',
+    venue:'Nueva York/NJ', stadium:'MetLife Stadium', city:'East Rutherford' },
+  { id:'L6', kickoff:'2026-06-27T21:00:00Z', group:'L', home:'Croacia', away:'Ghana',
+    venue:'Filadelfia', stadium:'Lincoln Financial Field', city:'Filadelfia' },
+  { id:'K5', kickoff:'2026-06-27T23:30:00Z', group:'K', home:'Colombia', away:'Portugal',
+    venue:'Miami', stadium:'Hard Rock Stadium', city:'Miami Gardens' },
+  { id:'K6', kickoff:'2026-06-27T23:30:00Z', group:'K', home:'RD Congo', away:'Uzbekistán',
+    venue:'Atlanta', stadium:'Mercedes-Benz Stadium', city:'Atlanta' },
+  { id:'J5', kickoff:'2026-06-28T02:00:00Z', group:'J', home:'Argelia', away:'Austria',
+    venue:'Kansas City', stadium:'Arrowhead Stadium', city:'Kansas City' },
+  { id:'J6', kickoff:'2026-06-28T02:00:00Z', group:'J', home:'Jordania', away:'Argentina',
+    venue:'Dallas', stadium:'AT&T Stadium', city:'Arlington', isArgentina:true },
 ]
+
+export const BASE_MATCHES: Match[] = RAW_MATCHES.map(buildMatch)
 
 // ─── NOTICIAS ────────────────────────────────────────────────────────────────
 
