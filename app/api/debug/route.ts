@@ -28,7 +28,7 @@ const ESPN_ALIASES: Record<string, string> = {
   spain:'espana', capeverde:'caboverde', saudiarabia:'arabiasaudi',
   france:'francia', iraq:'irak', norway:'noruega', algeria:'argelia',
   jordan:'jordania', drcongo:'rdcongo', congodr:'rdcongo',
-  slovenia:'eslovenia', england:'inglaterra', croatia:'croacia', egypt:'egipto',
+  england:'inglaterra', croatia:'croacia', egypt:'egipto',
 }
 
 function matchTeamName(espnName: string, ourName: string): boolean {

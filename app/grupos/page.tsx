@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { GROUPS, TEAMS_BY_SLUG, BASE_MATCHES } from '@/lib/data'
 import { calculateStandings } from '@/lib/standings'
+import { applyResults, fetchLiveResults } from '@/lib/espn'
 import { StandingsTable } from '@/components/StandingsTable'
 
 export const metadata: Metadata = {
@@ -14,7 +15,10 @@ const GROUP_COLORS = [
   '#059669','#db2777','#64748b','#C9A84C','#16a34a','#6366f1',
 ]
 
-export default function GruposPage() {
+export default async function GruposPage() {
+  const liveResults = await fetchLiveResults()
+  const matches = applyResults(BASE_MATCHES, liveResults)
+
   return (
     <div className="content-area">
       <div className="page-header">
@@ -29,9 +33,9 @@ export default function GruposPage() {
           const fullTeams = group.teams.map(t => TEAMS_BY_SLUG[t.slug])
           const hasChamp = fullTeams.some(t => t?.isChampion)
           const color = GROUP_COLORS[gi]
-          // Calcular posiciones con los datos base (el servidor no tiene los live)
-          // En /grupo/[letra] se usa el componente client que sí los tiene
-          const standings = calculateStandings(group.letter, BASE_MATCHES)
+          // Posiciones calculadas con los resultados reales de ESPN ya aplicados
+          // (misma fuente de datos que usa /grupo/[letra])
+          const standings = calculateStandings(group.letter, matches)
 
           return (
             <div key={group.letter} className={`g-card${hasChamp ? ' arg-group' : ''}`}>

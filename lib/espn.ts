@@ -96,7 +96,6 @@ const ESPN_ALIASES: Record<string, string> = {
   drcongo:      'rdcongo',
   congodr:      'rdcongo',
   democraticrepublicofthecongo: 'rdcongo',
-  slovenia:     'eslovenia',
   england:      'inglaterra',
   croatia:      'croacia',
   egypt:        'egipto',
