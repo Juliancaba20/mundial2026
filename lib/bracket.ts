@@ -1,5 +1,6 @@
 import type { Match, BracketMatch, BracketRound, BracketSlot, TeamRef } from '@/types'
 import { calculateStandings } from './standings'
+import { THIRD_PLACE_TABLE } from './thirdPlaceTable'
 
 // ─── Slot vacío ───────────────────────────────────────────────────────────────
 
@@ -40,13 +41,43 @@ function getBestThirds(matches: Match[]): Array<{ group: string; team: TeamRef |
     .map(t => ({ group: t.group, team: t.team }))
 }
 
-// ─── Cruces de 16avos según reglamento FIFA 2026 ─────────────────────────────
-// Los 24 clasificados directos (1° y 2° de cada grupo) se cruzan así:
-// 1A vs 2B | 1B vs 2A | 1C vs 2D | 1D vs 2C
-// 1E vs 2F | 1F vs 2E | 1G vs 2H | 1H vs 2G
-// 1I vs 2J | 1J vs 2I | 1K vs 2L | 1L vs 2K
-// Los 8 mejores terceros se asignan a los slots 13-16
-// (la tabla oficial de asignación de terceros se publica post-grupos)
+// ─── Asignación oficial de los 8 mejores terceros (Anexo C, Reglamento FIFA) ──
+// Qué grupo enfrenta a qué tercero depende de CUÁLES 8 grupos (de los 12)
+// aportan un tercero clasificado. FIFA publicó las 495 combinaciones posibles
+// en el Anexo C del reglamento. THIRD_PLACE_TABLE contiene esa tabla completa.
+// Devuelve, para cada uno de los 8 grupos ganadores (A,B,D,E,G,I,K,L), el grupo
+// de origen del tercero que le toca enfrentar, según la combinación real.
+
+function resolveThirdPlaceMatchups(
+  bestThirds: Array<{ group: string; team: TeamRef | null }>
+): Record<'A' | 'B' | 'D' | 'E' | 'G' | 'I' | 'K' | 'L', string | null> {
+  const qualifiedGroups = bestThirds
+    .slice(0, 8)
+    .map(t => t.group)
+    .filter(g => bestThirds.find(t => t.group === g)?.team != null)
+    .sort()
+
+  // Si todavía no hay 8 terceros con equipo real (fase de grupos incompleta),
+  // no se puede resolver la fila exacta del Anexo C todavía.
+  if (qualifiedGroups.length !== 8) {
+    return { A: null, B: null, D: null, E: null, G: null, I: null, K: null, L: null }
+  }
+
+  const row = THIRD_PLACE_TABLE.find(
+    r => r.groups.length === qualifiedGroups.length && r.groups.every((g, i) => g === qualifiedGroups[i])
+  )
+
+  if (!row) {
+    // No debería ocurrir: las 495 combinaciones cubren todos los choose(12,8) casos.
+    return { A: null, B: null, D: null, E: null, G: null, I: null, K: null, L: null }
+  }
+
+  return row.vs as Record<'A' | 'B' | 'D' | 'E' | 'G' | 'I' | 'K' | 'L', string>
+}
+
+// ─── Cruces de 16avos según el cuadro oficial FIFA World Cup 26 ──────────────
+// Partidos 73-88 del calendario oficial. 8 cruces son 1°/2° o 2°/2° fijos;
+// los otros 8 son "Ganador de Grupo vs Mejor 3°", resueltos vía Anexo C.
 
 export function buildBracket(matches: Match[]): BracketMatch[] {
   // Calcular clasificados de cada grupo
@@ -68,35 +99,37 @@ export function buildBracket(matches: Match[]): BracketMatch[] {
   }
 
   const bestThirds = getBestThirds(matches)
+  const thirdMatchups = resolveThirdPlaceMatchups(bestThirds)
 
-  function third(rank: number): BracketSlot {
-    const entry = bestThirds[rank - 1]
-    if (!entry) return emptySlot(`Mejor 3° (${rank})`)
-    return entry.team
-      ? teamSlot(entry.team, `3° Grupo ${entry.group}`)
-      : emptySlot(`Mejor 3° (${rank})`)
+  // Slot del "mejor 3°" que enfrenta al ganador de groupLetter, con el label
+  // oficial (lista de grupos posibles) hasta que se resuelva, y el equipo real
+  // una vez que el Anexo C ya determinó el origen exacto.
+  function thirdVs(groupLetter: 'A' | 'B' | 'D' | 'E' | 'G' | 'I' | 'K' | 'L', possibleGroupsLabel: string): BracketSlot {
+    const originGroup = thirdMatchups[groupLetter]
+    if (!originGroup) return emptySlot(`Mejor 3° Grupo ${possibleGroupsLabel}`)
+    const entry = bestThirds.find(t => t.group === originGroup)
+    if (!entry?.team) return emptySlot(`Mejor 3° Grupo ${possibleGroupsLabel}`)
+    return teamSlot(entry.team, `3° Grupo ${originGroup}`)
   }
 
-  // ── 16avos (R32) — 16 partidos ────────────────────────────────────────────
+  // ── 16avos (R32) — 16 partidos, cuadro oficial FIFA (partidos 73-88) ──────
   const r32: BracketMatch[] = [
-    // Mitad izquierda del bracket (partidos 1-8)
-    { id:'R32-1',  round:'R32', date:'28 jun', home:first('A'),  away:second('B'), status:'pending', nextMatchId:'R16-1', nextPosition:'home' },
-    { id:'R32-2',  round:'R32', date:'28 jun', home:first('B'),  away:second('A'), status:'pending', nextMatchId:'R16-1', nextPosition:'away' },
-    { id:'R32-3',  round:'R32', date:'29 jun', home:first('C'),  away:second('D'), status:'pending', nextMatchId:'R16-2', nextPosition:'home' },
-    { id:'R32-4',  round:'R32', date:'29 jun', home:first('D'),  away:second('C'), status:'pending', nextMatchId:'R16-2', nextPosition:'away' },
-    { id:'R32-5',  round:'R32', date:'30 jun', home:first('E'),  away:second('F'), status:'pending', nextMatchId:'R16-3', nextPosition:'home' },
-    { id:'R32-6',  round:'R32', date:'30 jun', home:first('F'),  away:second('E'), status:'pending', nextMatchId:'R16-3', nextPosition:'away' },
-    { id:'R32-7',  round:'R32', date:'1 jul',  home:first('G'),  away:second('H'), status:'pending', nextMatchId:'R16-4', nextPosition:'home' },
-    { id:'R32-8',  round:'R32', date:'1 jul',  home:first('H'),  away:second('G'), status:'pending', nextMatchId:'R16-4', nextPosition:'away' },
-    // Mitad derecha del bracket (partidos 9-16)
-    { id:'R32-9',  round:'R32', date:'2 jul',  home:first('I'),  away:second('J'), status:'pending', nextMatchId:'R16-5', nextPosition:'home' },
-    { id:'R32-10', round:'R32', date:'2 jul',  home:first('J'),  away:second('I'), status:'pending', nextMatchId:'R16-5', nextPosition:'away' },
-    { id:'R32-11', round:'R32', date:'3 jul',  home:first('K'),  away:second('L'), status:'pending', nextMatchId:'R16-6', nextPosition:'home' },
-    { id:'R32-12', round:'R32', date:'3 jul',  home:first('L'),  away:second('K'), status:'pending', nextMatchId:'R16-6', nextPosition:'away' },
-    { id:'R32-13', round:'R32', date:'28 jun', home:third(1),    away:third(2),    status:'pending', nextMatchId:'R16-7', nextPosition:'home' },
-    { id:'R32-14', round:'R32', date:'29 jun', home:third(3),    away:third(4),    status:'pending', nextMatchId:'R16-7', nextPosition:'away' },
-    { id:'R32-15', round:'R32', date:'30 jun', home:third(5),    away:third(6),    status:'pending', nextMatchId:'R16-8', nextPosition:'home' },
-    { id:'R32-16', round:'R32', date:'1 jul',  home:third(7),    away:third(8),    status:'pending', nextMatchId:'R16-8', nextPosition:'away' },
+    { id:'R32-1',  round:'R32', date:'28 jun', home:second('A'), away:second('B'),                status:'pending', nextMatchId:'R16-1', nextPosition:'home' }, // Partido 73
+    { id:'R32-2',  round:'R32', date:'29 jun', home:first('E'),  away:thirdVs('E', 'A/B/C/D/F'),   status:'pending', nextMatchId:'R16-1', nextPosition:'away' }, // Partido 74
+    { id:'R32-3',  round:'R32', date:'29 jun', home:first('F'),  away:second('C'),                 status:'pending', nextMatchId:'R16-2', nextPosition:'home' }, // Partido 75
+    { id:'R32-4',  round:'R32', date:'29 jun', home:first('C'),  away:second('F'),                 status:'pending', nextMatchId:'R16-2', nextPosition:'away' }, // Partido 76
+    { id:'R32-5',  round:'R32', date:'30 jun', home:first('I'),  away:thirdVs('I', 'C/D/F/G/H'),   status:'pending', nextMatchId:'R16-3', nextPosition:'home' }, // Partido 77
+    { id:'R32-6',  round:'R32', date:'30 jun', home:second('E'), away:second('I'),                 status:'pending', nextMatchId:'R16-3', nextPosition:'away' }, // Partido 78
+    { id:'R32-7',  round:'R32', date:'30 jun', home:first('A'),  away:thirdVs('A', 'C/E/F/H/I'),   status:'pending', nextMatchId:'R16-4', nextPosition:'home' }, // Partido 79
+    { id:'R32-8',  round:'R32', date:'1 jul',  home:first('L'),  away:thirdVs('L', 'E/H/I/J/K'),   status:'pending', nextMatchId:'R16-4', nextPosition:'away' }, // Partido 80
+    { id:'R32-9',  round:'R32', date:'1 jul',  home:first('D'),  away:thirdVs('D', 'B/E/F/I/J'),   status:'pending', nextMatchId:'R16-5', nextPosition:'home' }, // Partido 81
+    { id:'R32-10', round:'R32', date:'1 jul',  home:first('G'),  away:thirdVs('G', 'A/E/H/I/J'),   status:'pending', nextMatchId:'R16-5', nextPosition:'away' }, // Partido 82
+    { id:'R32-11', round:'R32', date:'2 jul',  home:second('K'), away:second('L'),                 status:'pending', nextMatchId:'R16-6', nextPosition:'home' }, // Partido 83
+    { id:'R32-12', round:'R32', date:'2 jul',  home:first('H'),  away:second('J'),                 status:'pending', nextMatchId:'R16-6', nextPosition:'away' }, // Partido 84
+    { id:'R32-13', round:'R32', date:'2 jul',  home:first('B'),  away:thirdVs('B', 'E/F/G/I/J'),   status:'pending', nextMatchId:'R16-7', nextPosition:'home' }, // Partido 85
+    { id:'R32-14', round:'R32', date:'3 jul',  home:first('J'),  away:second('H'),                 status:'pending', nextMatchId:'R16-7', nextPosition:'away' }, // Partido 86
+    { id:'R32-15', round:'R32', date:'3 jul',  home:first('K'),  away:thirdVs('K', 'D/E/I/J/L'),   status:'pending', nextMatchId:'R16-8', nextPosition:'home' }, // Partido 87
+    { id:'R32-16', round:'R32', date:'3 jul',  home:second('D'), away:second('G'),                 status:'pending', nextMatchId:'R16-8', nextPosition:'away' }, // Partido 88
   ]
 
   // ── Octavos (R16) — 8 partidos ────────────────────────────────────────────
