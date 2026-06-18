@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Image from 'next/image'
-import type { BracketMatch, BracketRound, BracketSlot, LiveResultsMap, Match } from '@/types'
+import type { BracketMatch, BracketRound, BracketSlot, LiveResultsMap, KnockoutResultsMap, Match } from '@/types'
 import { buildBracket, ROUND_LABELS, ROUND_DATES, BRACKET_ROUNDS } from '@/lib/bracket'
 import { BASE_MATCHES } from '@/lib/data'
 
@@ -257,9 +257,9 @@ export function BracketView() {
     try {
       const res = await fetch('/api/resultados', { cache: 'no-store' })
       if (!res.ok) return
-      const results: LiveResultsMap = await res.json()
-      const updatedMatches = applyResults(BASE_MATCHES, results)
-      setBracket(buildBracket(updatedMatches))
+      const data: { results: LiveResultsMap; knockoutResults: KnockoutResultsMap } = await res.json()
+      const updatedMatches = applyResults(BASE_MATCHES, data.results ?? {})
+      setBracket(buildBracket(updatedMatches, data.knockoutResults ?? {}))
       setLastUpdated(
         new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
       )

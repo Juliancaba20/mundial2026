@@ -1,4 +1,4 @@
-import type { Match, BracketMatch, BracketRound, BracketSlot, TeamRef } from '@/types'
+import type { Match, BracketMatch, BracketRound, BracketSlot, TeamRef, KnockoutResultsMap } from '@/types'
 import { calculateStandings } from './standings'
 import { THIRD_PLACE_TABLE } from './thirdPlaceTable'
 
@@ -75,11 +75,90 @@ function resolveThirdPlaceMatchups(
   return row.vs as Record<'A' | 'B' | 'D' | 'E' | 'G' | 'I' | 'K' | 'L', string>
 }
 
+// ─── Propagación de ganadores entre rondas ────────────────────────────────────
+// Dado un BracketMatch con ambos equipos ya conocidos, busca en
+// KnockoutResultsMap (indexado por slug de equipo) el resultado de ESE cruce
+// específico — confirmando que el rival que ESPN reportó para cada equipo
+// coincide con el rival real del partido — y devuelve el ganador (o null si
+// el partido no terminó, no se encontró, o no hay datos todavía).
+
+function resolveMatchResult(
+  home: TeamRef,
+  away: TeamRef,
+  knockoutResults: KnockoutResultsMap
+): { winner: TeamRef; homeScore: string; awayScore: string } | null {
+  const homeResult = knockoutResults[home.slug]
+  const awayResult = knockoutResults[away.slug]
+
+  // Preferimos el resultado visto desde el lado "home": si ESPN reportó que
+  // el rival de `home` fue exactamente `away`, es el mismo partido.
+  const fromHome = homeResult && homeResult.opponentSlug === away.slug ? homeResult : null
+  const fromAway = awayResult && awayResult.opponentSlug === home.slug ? awayResult : null
+  const result = fromHome ?? fromAway
+  if (!result || result.status !== 'done') return null
+
+  const homeScoreNum = parseInt(fromHome ? result.ownScore : result.opponentScore, 10)
+  const awayScoreNum = parseInt(fromHome ? result.opponentScore : result.ownScore, 10)
+  if (isNaN(homeScoreNum) || isNaN(awayScoreNum)) return null
+  if (homeScoreNum === awayScoreNum) return null // empate sin penales resueltos aún: no propagar
+
+  const winner = homeScoreNum > awayScoreNum ? home : away
+  return {
+    winner,
+    homeScore: String(homeScoreNum),
+    awayScore: String(awayScoreNum),
+  }
+}
+
+// Aplica los resultados conocidos a una ronda ya construida, completando
+// `score`/`status` en sus partidos, y empuja al ganador de cada partido
+// terminado al slot correspondiente de la ronda siguiente (según
+// nextMatchId/nextPosition). Devuelve la ronda siguiente ya actualizada,
+// para encadenar ronda tras ronda (R32→R16→QF→SF→F/3RD).
+
+function propagateRound(
+  currentRound: BracketMatch[],
+  nextRound: BracketMatch[],
+  knockoutResults: KnockoutResultsMap
+): { current: BracketMatch[]; next: BracketMatch[] } {
+  const updatedCurrent = currentRound.map(m => ({
+    ...m,
+    home: { ...m.home },
+    away: { ...m.away },
+  }))
+  const updatedNext = nextRound.map(m => ({
+    ...m,
+    home: { ...m.home },
+    away: { ...m.away },
+  }))
+
+  for (const match of updatedCurrent) {
+    if (!match.home.team || !match.away.team) continue // slot aún no resuelto
+
+    const result = resolveMatchResult(match.home.team, match.away.team, knockoutResults)
+    if (!result) continue
+
+    // Marcar el resultado en el partido actual para que se muestre el score
+    match.home.score = result.homeScore
+    match.away.score = result.awayScore
+    match.status = 'done'
+
+    if (!match.nextMatchId || !match.nextPosition) continue
+    const target = updatedNext.find(m => m.id === match.nextMatchId)
+    if (!target) continue
+
+    const label = target[match.nextPosition].label
+    target[match.nextPosition] = teamSlot(result.winner, label)
+  }
+
+  return { current: updatedCurrent, next: updatedNext }
+}
+
 // ─── Cruces de 16avos según el cuadro oficial FIFA World Cup 26 ──────────────
 // Partidos 73-88 del calendario oficial. 8 cruces son 1°/2° o 2°/2° fijos;
 // los otros 8 son "Ganador de Grupo vs Mejor 3°", resueltos vía Anexo C.
 
-export function buildBracket(matches: Match[]): BracketMatch[] {
+export function buildBracket(matches: Match[], knockoutResults: KnockoutResultsMap = {}): BracketMatch[] {
   // Calcular clasificados de cada grupo
   const groupStandings: Record<string, ReturnType<typeof calculateStandings>> = {}
   for (const letter of 'ABCDEFGHIJKL'.split('')) {
@@ -164,7 +243,34 @@ export function buildBracket(matches: Match[]): BracketMatch[] {
     { id:'F',   round:'F',   date:'19 jul', home:emptySlot('Ganador SF-1'), away:emptySlot('Ganador SF-2'),  status:'pending' },
   ]
 
-  return [...r32, ...r16, ...qf, ...sf, ...final]
+  // ── Propagar ganadores ronda por ronda ────────────────────────────────────
+  // R32 ya tiene los slots resueltos por standings/Anexo C. A partir de acá,
+  // cada ronda completa la siguiente según los resultados reales de ESPN.
+  const step1 = propagateRound(r32, r16, knockoutResults)
+  const step2 = propagateRound(step1.next, qf, knockoutResults)
+  const step3 = propagateRound(step2.next, sf, knockoutResults)
+  const step4 = propagateRound(step3.next, final, knockoutResults)
+
+  const r32Filled = step1.current
+  const r16Filled = step2.current
+  const qfFilled = step3.current
+  const sfFilled = step4.current
+  const finalFilled = step4.next
+
+  // El 3er puesto lo juegan los PERDEDORES de semis, no los ganadores: hay que
+  // resolverlo aparte, porque propagateRound solo empuja ganadores.
+  for (const sfMatch of sfFilled) {
+    if (!sfMatch.home.team || !sfMatch.away.team) continue
+    const result = resolveMatchResult(sfMatch.home.team, sfMatch.away.team, knockoutResults)
+    if (!result) continue
+    const loser = result.winner.slug === sfMatch.home.team.slug ? sfMatch.away.team : sfMatch.home.team
+    const thirdMatch = finalFilled.find(m => m.id === '3RD')
+    if (!thirdMatch) continue
+    if (sfMatch.id === 'SF-1') thirdMatch.home = teamSlot(loser, thirdMatch.home.label)
+    if (sfMatch.id === 'SF-2') thirdMatch.away = teamSlot(loser, thirdMatch.away.label)
+  }
+
+  return [...r32Filled, ...r16Filled, ...qfFilled, ...sfFilled, ...finalFilled]
 }
 
 // ─── Helpers para el componente ───────────────────────────────────────────────

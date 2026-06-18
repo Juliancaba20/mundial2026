@@ -115,3 +115,20 @@ export interface LiveResult {
 }
 
 export type LiveResultsMap = Record<string, LiveResult>
+
+// ─── Resultados de eliminatorias (por equipo, no por par fijo) ───────────────
+// En knockout el rival de cada equipo no se conoce de antemano (depende del
+// bracket calculado en runtime), así que no podemos indexar por "home_away"
+// como en grupos. Indexamos por slug de equipo: cada equipo apunta a su
+// partido de eliminatorias más reciente conocido por ESPN.
+
+export interface KnockoutTeamResult {
+  opponentSlug: string | null  // null si el rival no se reconoció como equipo propio
+  opponentName: string         // nombre tal como lo reportó ESPN, para debug
+  ownScore: string
+  opponentScore: string
+  status: MatchStatus
+  clock: string
+}
+
+export type KnockoutResultsMap = Record<string, KnockoutTeamResult>

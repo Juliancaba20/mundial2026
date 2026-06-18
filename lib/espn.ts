@@ -1,17 +1,22 @@
-import type { ESPNResponse, LiveResult, LiveResultsMap, Match } from '@/types'
-import { BASE_MATCHES } from '@/lib/data'
+import type { ESPNResponse, LiveResult, LiveResultsMap, KnockoutResultsMap, Match } from '@/types'
+import { BASE_MATCHES, TEAMS } from '@/lib/data'
 
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard'
 
-// Consultamos TODAS las fechas del torneo en rango amplio.
-// ESPN usa la fecha UTC del estadio (hora local de la sede), que puede diferir
-// de la fecha que nosotros mostramos al usuario. No filtramos por fecha aquí —
-// dejamos que el matching por nombre de equipo identifique cada partido.
-const GROUP_STAGE_DATES = [
+// Consultamos TODAS las fechas del torneo en rango amplio: fase de grupos
+// (11-27 jun) + fase eliminatoria completa (28 jun - 19 jul: 16avos, octavos,
+// cuartos, semis, 3er puesto y final). ESPN usa la fecha UTC del estadio (hora
+// local de la sede), que puede diferir de la fecha que nosotros mostramos al
+// usuario. No filtramos por fecha aquí más allá de este rango — dejamos que el
+// matching por nombre de equipo identifique cada partido.
+const TOURNAMENT_DATES = [
   '20260611','20260612','20260613','20260614','20260615','20260616',
   '20260617','20260618','20260619','20260620','20260621','20260622',
   '20260623','20260624','20260625','20260626','20260627','20260628',
-  '20260629','20260630',
+  '20260629','20260630','20260701','20260702','20260703','20260704',
+  '20260705','20260706','20260707','20260708','20260709','20260710',
+  '20260711','20260712','20260713','20260714','20260715','20260716',
+  '20260717','20260718','20260719',
 ]
 
 // ─── normalize ───────────────────────────────────────────────────────────────
@@ -137,7 +142,12 @@ async function fetchDateResults(
   }
 }
 
-export async function fetchLiveResults(): Promise<LiveResultsMap> {
+export interface FetchResultsOutput {
+  results: LiveResultsMap          // indexado por par home_away — fase de grupos
+  knockoutResults: KnockoutResultsMap  // indexado por slug de equipo — eliminatorias
+}
+
+export async function fetchLiveResults(): Promise<FetchResultsOutput> {
   const today = new Date()
   const todayStr = today.toISOString().slice(0, 10).replace(/-/g, '')
 
@@ -146,11 +156,11 @@ export async function fetchLiveResults(): Promise<LiveResultsMap> {
   tomorrow.setDate(tomorrow.getDate() + 1)
   const tomorrowStr = tomorrow.toISOString().slice(0, 10).replace(/-/g, '')
 
-  const relevantDates = GROUP_STAGE_DATES.filter(d => d <= tomorrowStr)
+  const relevantDates = TOURNAMENT_DATES.filter(d => d <= tomorrowStr)
 
   if (!relevantDates.length) {
     console.log('[ESPN] Torneo aún no comenzó')
-    return {}
+    return { results: {}, knockoutResults: {} }
   }
 
   console.log(`[ESPN] Consultando ${relevantDates.length} fechas`)
@@ -160,8 +170,16 @@ export async function fetchLiveResults(): Promise<LiveResultsMap> {
   )
 
   const results: LiveResultsMap = {}
-  let totalEvents = 0, withScore = 0, matched = 0, unmatched = 0
+  const knockoutResults: KnockoutResultsMap = {}
+  let totalEvents = 0, withScore = 0, matched = 0, unmatched = 0, knockoutMatched = 0
   const unmatchedNames: string[] = []
+
+  // Para reconocer equipos individuales en partidos de eliminatorias (donde
+  // el rival no está fijado de antemano en BASE_MATCHES).
+  function findOwnTeamBySlug(espnName: string): { slug: string } | null {
+    const team = TEAMS.find(t => matchTeamName(espnName, t.name))
+    return team ? { slug: team.slug } : null
+  }
 
   for (const res of responses) {
     if (res.status !== 'fulfilled' || !res.value.data) continue
@@ -185,7 +203,8 @@ export async function fetchLiveResults(): Promise<LiveResultsMap> {
       // STATUS_FULL_TIME = finalizado (el status real que devuelve ESPN)
       const actuallyDone = statusName === 'STATUS_FULL_TIME' ||
                            statusName === 'STATUS_FINAL' ||
-                           statusName === 'STATUS_FULL_PEN'
+                           statusName === 'STATUS_FULL_PEN' ||
+                           statusName === 'STATUS_FULL_PENALTY' // alias visto en algunos eventos de eliminatorias
       const actuallyLive = statusName === 'STATUS_IN_PROGRESS' ||
                            statusName === 'STATUS_FIRST_HALF' ||
                            statusName === 'STATUS_SECOND_HALF' ||
@@ -233,18 +252,57 @@ export async function fetchLiveResults(): Promise<LiveResultsMap> {
       } else {
         unmatched++
         unmatchedNames.push(`"${htName}" vs "${atName}" [${normalize(htName)} / ${normalize(atName)}]`)
-        console.warn(`[ESPN] ✗ NO MATCH: "${htName}" vs "${atName}"`)
+        console.warn(`[ESPN] ✗ NO MATCH (par fijo): "${htName}" vs "${atName}"`)
+      }
+
+      // ── Matching por equipo individual (necesario en eliminatorias) ──────
+      // No depende de BASE_MATCHES: reconoce cada uno de los 48 equipos por
+      // nombre, sin requerir que el par exacto esté pre-cargado.
+      const homeTeam = findOwnTeamBySlug(htName)
+      const awayTeam = findOwnTeamBySlug(atName)
+
+      if (homeTeam || awayTeam) {
+        const statusKO: Match['status'] = actuallyDone ? 'done' : 'live'
+        // No sobreescribir un resultado final con uno más viejo/en vivo
+        if (homeTeam) {
+          const prev = knockoutResults[homeTeam.slug]
+          if (!(prev?.status === 'done' && !actuallyDone)) {
+            knockoutResults[homeTeam.slug] = {
+              opponentSlug: awayTeam?.slug ?? null,
+              opponentName: atName,
+              ownScore: ht.score,
+              opponentScore: at.score,
+              status: statusKO,
+              clock: ev.status?.displayClock ?? '',
+            }
+            knockoutMatched++
+          }
+        }
+        if (awayTeam) {
+          const prev = knockoutResults[awayTeam.slug]
+          if (!(prev?.status === 'done' && !actuallyDone)) {
+            knockoutResults[awayTeam.slug] = {
+              opponentSlug: homeTeam?.slug ?? null,
+              opponentName: htName,
+              ownScore: at.score,
+              opponentScore: ht.score,
+              status: statusKO,
+              clock: ev.status?.displayClock ?? '',
+            }
+            knockoutMatched++
+          }
+        }
       }
     }
   }
 
   console.log(
     `[ESPN] RESUMEN: ${totalEvents} eventos, ${withScore} con score, ` +
-    `${matched} matcheados, ${unmatched} sin match` +
+    `${matched} matcheados (grupos), ${knockoutMatched} matcheados (equipos/eliminatorias), ${unmatched} sin match` +
     (unmatchedNames.length ? ` → ${unmatchedNames.join(' | ')}` : '')
   )
 
-  return results
+  return { results, knockoutResults }
 }
 
 export function applyResults(matches: Match[], results: LiveResultsMap): Match[] {

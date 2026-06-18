@@ -6,14 +6,15 @@ export const revalidate = 60
 
 export async function GET() {
   try {
-    const results = await fetchLiveResults()
-    return NextResponse.json(results, {
+    const data = await fetchLiveResults()
+    return NextResponse.json(data, {
       headers: {
         'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30',
       },
     })
   } catch (error) {
     console.error('ESPN fetch error:', error)
-    return NextResponse.json({}, { status: 200 }) // 200 con vacío → app muestra fixture base
+    // 200 con vacío → la app sigue mostrando el fixture base sin romper
+    return NextResponse.json({ results: {}, knockoutResults: {} }, { status: 200 })
   }
 }

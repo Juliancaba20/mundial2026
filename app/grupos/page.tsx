@@ -16,7 +16,7 @@ const GROUP_COLORS = [
 ]
 
 export default async function GruposPage() {
-  const liveResults = await fetchLiveResults()
+  const { results: liveResults } = await fetchLiveResults()
   const matches = applyResults(BASE_MATCHES, liveResults)
 
   return (
