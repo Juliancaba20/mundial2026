@@ -17,6 +17,20 @@ function applyResults(matches: Match[], results: LiveResultsMap): Match[] {
   })
 }
 
+// Convierte un kickoff ISO UTC a la etiqueta de fecha local del navegador.
+// Mismo criterio que MatchTime.tsx para evitar discrepancias de día.
+// Ej: "2026-06-18T02:00:00Z" en Buenos Aires (UTC-3) → "17 jun"
+function getLocalDateLabel(kickoff: string): string {
+  const d = new Date(kickoff)
+  if (isNaN(d.getTime())) return ''
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+  return d.toLocaleDateString('es', {
+    timeZone: tz,
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
 interface Props {
   groupFilter?: string  // si viene de la página de grupo
 }
@@ -28,6 +42,11 @@ export function MatchesClient({ groupFilter }: Props) {
   const [statusText, setStatusText] = useState('Cargando resultados…')
   const [apiError, setApiError] = useState(false)
   const [hasLive, setHasLive] = useState(false)
+
+  // Mapa matchId → etiqueta de fecha local del navegador.
+  // Empieza vacío (SSR/hidratación) y se rellena en el primer useEffect.
+  // Mientras esté vacío, el fallback es m.date (UTC), igual que MatchTime.
+  const [localDateMap, setLocalDateMap] = useState<Record<string, string>>({})
 
   const fetchResults = useCallback(async () => {
     try {
@@ -52,6 +71,13 @@ export function MatchesClient({ groupFilter }: Props) {
   }, [])
 
   useEffect(() => {
+    // Calcular fechas locales una sola vez al montar (solo corre en el cliente)
+    const map: Record<string, string> = {}
+    for (const m of BASE_MATCHES) {
+      map[m.id] = getLocalDateLabel(m.kickoff)
+    }
+    setLocalDateMap(map)
+
     fetchResults()
     // Polling cada 60 segundos si hay partidos en vivo
     const id = setInterval(fetchResults, 60_000)
@@ -62,13 +88,32 @@ export function MatchesClient({ groupFilter }: Props) {
 
   const groupLetters = 'ABCDEFGHIJKL'.split('')
 
+  // Obtiene la etiqueta de fecha para agrupar: local si ya hidrató, UTC como fallback
+  function dateLabel(m: Match): string {
+    return localDateMap[m.id] || m.date
+  }
+
   function renderList() {
     if (!list.length) return <div style={{ textAlign:'center', padding:'48px', color:'var(--faint)', fontSize:14 }}>No hay partidos para este grupo.</div>
 
     if (sortMode === 'date') {
-      const days = [...new Set(list.map(m => m.date))]
+      // Construir lista de días únicos preservando el orden cronológico (dateSort)
+      const sorted = [...list].sort((a, b) => {
+        // Primero por fecha, luego por hora exacta dentro del día
+        if (a.dateSort !== b.dateSort) return a.dateSort - b.dateSort
+        return new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
+      })
+
+      // Días únicos en orden de aparición (ya ordenados arriba)
+      const days: string[] = []
+      const seen = new Set<string>()
+      for (const m of sorted) {
+        const label = dateLabel(m)
+        if (!seen.has(label)) { seen.add(label); days.push(label) }
+      }
+
       return days.map(day => {
-        const dayMatches = list.filter(m => m.date === day)
+        const dayMatches = sorted.filter(m => dateLabel(m) === day)
         return (
           <div key={day}>
             <div className="day-label">
