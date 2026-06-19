@@ -425,14 +425,19 @@ button { font-family: var(--body); cursor: pointer; }
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  min-width: 172px;
-  transition: border-color .15s;
+  transition: border-color .18s, box-shadow .18s, transform .15s;
+  cursor: pointer;
 }
-.br-match:hover { border-color: var(--border2); }
+.br-match:hover { border-color: var(--border2); box-shadow: 0 2px 12px rgba(0,0,0,.25); }
 .br-match-live  { border-color: rgba(232,0,61,.4); }
 .br-match-highlight {
   border-color: rgba(201,168,76,.5);
   background: linear-gradient(135deg, var(--surface), var(--gold-dim));
+}
+.br-match-highlight:hover {
+  border-color: rgba(201,168,76,.8);
+  box-shadow: 0 4px 20px rgba(201,168,76,.15);
+  transform: translateY(-1px);
 }
 .br-match-date {
   font-size: 9px; font-weight: 600; letter-spacing: .07em;
@@ -471,6 +476,30 @@ button { font-family: var(--body); cursor: pointer; }
 .br-empty { opacity: .55; }
 .br-divider { height: 1px; background: var(--border); margin: 0; }
 
+/* ── JERARQUÍA POR RONDA ──────────────────────────────────────────────────
+   El tamaño y peso visual de la card crece progresivamente desde 16avos
+   hasta la Final, para que el ojo entienda de inmediato qué ronda pesa más,
+   igual que en FIFA/ESPN/Sofascore. */
+.br-scale-sm { min-width: 168px; }
+.br-scale-sm .br-slot { padding: 6px 9px; min-height: 30px; }
+.br-scale-sm .br-slot-name { font-size: 11.5px; }
+.br-scale-sm .br-slot-score { font-size: 14px; }
+
+.br-scale-md { min-width: 188px; }
+
+.br-scale-lg { min-width: 208px; border-width: 1px; }
+.br-scale-lg .br-slot { padding: 9px 12px; min-height: 38px; }
+.br-scale-lg .br-slot-name { font-size: 13px; font-weight: 600; }
+.br-scale-lg .br-slot-score { font-size: 17px; }
+.br-scale-lg .br-match-date { font-size: 9.5px; padding: 6px 12px 5px; }
+
+.br-scale-xl { min-width: 228px; }
+.br-scale-xl .br-slot { padding: 11px 14px; min-height: 44px; }
+.br-scale-xl .br-slot-name { font-size: 14px; font-weight: 700; }
+.br-scale-xl .br-slot-score { font-size: 20px; }
+.br-scale-xl .br-match-date { font-size: 10px; padding: 7px 14px 6px; }
+.br-scale-xl.br-match { border-radius: 12px; }
+
 /* ── DESKTOP BRACKET ─────────────────────────────────────────────────────── */
 .br-desktop { display: block; }
 .br-mobile  { display: none; }
@@ -487,23 +516,30 @@ button { font-family: var(--body); cursor: pointer; }
 
 .br-tree {
   display: flex;
-  align-items: center;
-  gap: 0;
+  align-items: stretch;
+  gap: 28px;
   min-width: max-content;
-  padding: 12px 0 24px;
+  padding: 32px 8px 24px;
+  position: relative;
 }
 
 .br-round-col {
   display: flex; flex-direction: column;
-  min-width: 190px;
+  width: var(--col-w, 196px);
+  flex-shrink: 0;
+  position: relative;
 }
-.br-round-col.br-round-final { min-width: 210px; }
+.br-round-col[data-round="R32"] { --col-w: 178px; }
+.br-round-col[data-round="R16"] { --col-w: 198px; }
+.br-round-col[data-round="QF"]  { --col-w: 198px; }
+.br-round-col[data-round="SF"]  { --col-w: 218px; }
 
 .br-round-header {
-  padding: 0 8px 12px;
+  padding: 0 4px 12px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 12px;
+  margin-bottom: 0;
   text-align: center;
+  flex-shrink: 0;
 }
 .br-round-name {
   font-family: var(--display); font-size: 14px;
@@ -511,55 +547,70 @@ button { font-family: var(--body); cursor: pointer; }
 }
 .br-round-date { font-size: 10px; color: var(--faint); margin-top: 2px; }
 
-.br-round-matches {
-  display: flex; flex-direction: column;
-  gap: 0; flex: 1;
-  justify-content: space-around;
-}
+/* Fase 4 — columna futura: atenúa cards, conectores y bloquea hover */
+.br-round-col.br-round-future .br-round-name,
+.br-round-col.br-round-future .br-round-date { opacity: .45; }
+.br-round-col.br-round-future .br-match { opacity: .45; pointer-events: none; }
+.br-round-col.br-round-future .br-connector { opacity: .3; }
+.br-round-col.br-round-future .br-sf-connector { opacity: .3; }
 
-.br-match-wrapper {
+/* Fase 5 — conector iluminado: verde cuando el ganador ya avanzó */
+.br-connector { transition: color .3s; }
+.br-sf-connector { transition: background .3s; }
+.br-connector-done { color: var(--green) !important; }
+.br-sf-connector.br-connector-done { background: var(--green) !important; }
+
+.br-round-matches {
   position: relative;
-  padding: 0 8px;
-  display: flex; flex-direction: column;
-  justify-content: center;
   flex: 1;
 }
 
-/* Líneas conectoras entre rondas */
+/* Cada partido se posiciona en su centro vertical exacto, calculado en JS
+   a partir de la unidad geométrica común al árbol entero (ver UNIT en TSX).
+   Esto reemplaza el viejo `justify-content: space-around`, que solo
+   aproximaba la posición y producía conectores desalineados. */
+.br-match-wrapper {
+  position: absolute;
+  left: 0; right: 0;
+  display: flex; align-items: center;
+  width: 100%;
+}
+.br-match-wrapper > .br-match { position: relative; z-index: 1; }
+
+/* Conectores SVG — calzan exactamente con el centro de la card en ambos
+   extremos porque comparten la misma unidad de medida que el posicionamiento
+   de las cards (ver RoundColumn en BracketView.tsx). */
 .br-connector {
   position: absolute;
-  right: 0; top: 50%;
-  width: 8px; height: 50%;
-  border-color: var(--border2);
-  border-style: solid;
-  border-width: 0;
-  pointer-events: none;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--border2);
+  overflow: visible;
 }
-.br-connector-home {
-  border-right-width: 1px;
-  border-bottom-width: 1px;
-  transform: translateY(-100%);
-  border-bottom-right-radius: 4px;
-}
-.br-connector-away {
-  border-right-width: 1px;
-  border-top-width: 1px;
-  border-top-right-radius: 4px;
-}
+.br-connector-left { left: 100%; }
+.br-connector-right { right: 100%; }
 
 /* ── FINAL SECTION (centro del bracket) ─────────────────────────────────── */
-.br-final-section {
+/* br-final-col actúa como columna estándar del flex tree, con la misma
+   altura que el resto, y br-final-section se posiciona absolutamente
+   en el centro exacto — el mismo punto donde llegan los conectores SF. */
+.br-final-col {
   display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  gap: 24px; padding: 0 16px;
-  min-width: 220px;
+  width: 248px; flex-shrink: 0;
+  position: relative;
+}
+.br-final-section {
+  position: absolute; left: 0; right: 0;
+  display: flex; flex-direction: column;
+  align-items: center;
+  gap: 20px;
 }
 .br-final-wrap, .br-third-wrap {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   width: 100%;
 }
 .br-final-label {
-  font-family: var(--display); font-size: 13px;
+  font-family: var(--display); font-size: 14px;
   letter-spacing: .08em; color: var(--gold); text-align: center;
 }
 .br-third-label {
@@ -567,6 +618,19 @@ button { font-family: var(--body); cursor: pointer; }
   letter-spacing: .06em; color: var(--muted); text-align: center;
 }
 .br-final-date { font-size: 10px; color: var(--faint); text-align: center; }
+
+/* Línea horizontal que conecta la card SF con el borde de la columna Final.
+   Sustituye el codo SVG que se usaba en rondas anteriores — SF conecta
+   directamente al centro del árbol, sin doblar hacia arriba o abajo. */
+.br-sf-connector {
+  position: absolute; top: 50%;
+  width: 28px; height: 1.5px;
+  background: var(--border2);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.br-sf-connector-left  { left: 100%; }
+.br-sf-connector-right { right: 100%; }
 
 /* ── MOBILE ──────────────────────────────────────────────────────────────── */
 .br-mobile-tabs {

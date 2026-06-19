@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { TEAMS, TEAMS_BY_SLUG, BASE_MATCHES } from '@/lib/data'
-import { MatchRow } from '@/components/MatchRow'
+import { LiveTeamMatches } from '@/components/LiveTeamMatches'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -73,13 +73,8 @@ export default async function EquipoPage({ params }: Props) {
         <p className="team-description">{team.description}</p>
       )}
 
-      {/* PARTIDOS */}
-      <div className="team-section-title">PARTIDOS — FASE DE GRUPOS</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-        {matches.map(m => (
-          <MatchRow key={m.id} match={m} showGroup={false} />
-        ))}
-      </div>
+      {/* PARTIDOS — client island con resultados ESPN en vivo */}
+      <LiveTeamMatches initialMatches={matches} />
 
       {/* OTROS EQUIPOS DEL GRUPO */}
       <div style={{ marginTop: 40 }}>
