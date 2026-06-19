@@ -33,8 +33,8 @@ export function MatchesClient({ groupFilter }: Props) {
     try {
       const res = await fetch('/api/resultados', { cache: 'no-store' })
       if (!res.ok) throw new Error('API error')
-      const results: LiveResultsMap = await res.json()
-      const updated = applyResults(BASE_MATCHES, results)
+      const data: { results: LiveResultsMap } = await res.json()
+      const updated = applyResults(BASE_MATCHES, data.results ?? {})
       setMatches(updated)
       const liveCount = updated.filter(m => m.status === 'live').length
       const doneCount = updated.filter(m => m.status === 'done').length
@@ -142,8 +142,8 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
   useEffect(() => {
     fetch('/api/resultados', { cache: 'no-store' })
       .then(r => r.json())
-      .then((results: LiveResultsMap) => {
-        setMatches(applyResults(initialMatches, results))
+      .then((data: { results: LiveResultsMap }) => {
+        setMatches(applyResults(initialMatches, data.results ?? {}))
       })
       .catch(() => {})
   }, [initialMatches])
@@ -198,7 +198,7 @@ export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }
   useEffect(() => {
     fetch('/api/resultados', { cache: 'no-store' })
       .then(r => r.json())
-      .then((results: LiveResultsMap) => setMatches(applyResults(initialMatches, results)))
+      .then((data: { results: LiveResultsMap }) => setMatches(applyResults(initialMatches, data.results ?? {})))
       .catch(() => {})
   }, [initialMatches])
 

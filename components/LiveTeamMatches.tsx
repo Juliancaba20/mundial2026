@@ -26,8 +26,8 @@ export function LiveTeamMatches({ initialMatches }: Props) {
     try {
       const res = await fetch('/api/resultados', { cache: 'no-store' })
       if (!res.ok) return
-      const results: LiveResultsMap = await res.json()
-      const updated = applyResults(initialMatches, results)
+      const data: { results: LiveResultsMap } = await res.json()
+      const updated = applyResults(initialMatches, data.results ?? {})
       setMatches(updated)
       setHasLive(updated.some(m => m.status === 'live'))
       setLastUpdated(
