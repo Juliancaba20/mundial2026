@@ -451,6 +451,16 @@ button { font-family: var(--body); cursor: pointer; }
   background: var(--red-dim); border-radius: 4px; padding: 1px 5px;
   letter-spacing: .04em;
 }
+/* Estados del header de fecha en MatchCard */
+.br-final-tag {
+  font-size: 9px; font-weight: 700; color: var(--green);
+  background: rgba(0,168,107,.12); border-radius: 4px; padding: 1px 5px;
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.br-kickoff-time {
+  margin-left: auto; font-weight: 700; color: var(--muted);
+}
+.br-match-done { border-color: var(--border2); }
 .br-slot {
   display: flex; align-items: center; justify-content: space-between;
   padding: 7px 10px; gap: 8px; min-height: 34px;
@@ -504,8 +514,12 @@ button { font-family: var(--body); cursor: pointer; }
 .br-desktop { display: block; }
 .br-mobile  { display: none; }
 
+/* El bracket fluye con la página: NO hay scroll vertical interno ni altura
+   máxima que genere caja propia. El scroll horizontal solo aparece cuando el
+   ancho del árbol excede el viewport. */
 .br-scroll-container {
   overflow-x: auto;
+  overflow-y: visible;
   padding-bottom: 12px;
   -webkit-overflow-scrolling: touch;
 }
@@ -519,7 +533,7 @@ button { font-family: var(--body); cursor: pointer; }
   align-items: stretch;
   gap: 28px;
   min-width: max-content;
-  padding: 32px 8px 24px;
+  padding: 8px 8px 8px;
   position: relative;
 }
 

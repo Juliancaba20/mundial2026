@@ -79,14 +79,22 @@ function resolveThirdPlaceMatchups(
 // Dado un BracketMatch con ambos equipos ya conocidos, busca en
 // KnockoutResultsMap (indexado por slug de equipo) el resultado de ESE cruce
 // específico — confirmando que el rival que ESPN reportó para cada equipo
-// coincide con el rival real del partido — y devuelve el ganador (o null si
-// el partido no terminó, no se encontró, o no hay datos todavía).
+// coincide con el rival real del partido — y devuelve:
+//   - { kind:'done',  winner, homeScore, awayScore } si terminó con ganador
+//     → propaga el ganador a la ronda siguiente.
+//   - { kind:'live',  homeScore, awayScore, clock } si está en juego
+//     → marca score + EN VIVO, pero NO propaga ganador (no terminó).
+//   - null si no hay datos, no coincide el cruce, o el resultado no es útil.
+
+type ResolvedResult =
+  | { kind: 'done'; winner: TeamRef; homeScore: string; awayScore: string }
+  | { kind: 'live'; homeScore: string; awayScore: string; clock: string }
 
 function resolveMatchResult(
   home: TeamRef,
   away: TeamRef,
   knockoutResults: KnockoutResultsMap
-): { winner: TeamRef; homeScore: string; awayScore: string } | null {
+): ResolvedResult | null {
   const homeResult = knockoutResults[home.slug]
   const awayResult = knockoutResults[away.slug]
 
@@ -95,15 +103,27 @@ function resolveMatchResult(
   const fromHome = homeResult && homeResult.opponentSlug === away.slug ? homeResult : null
   const fromAway = awayResult && awayResult.opponentSlug === home.slug ? awayResult : null
   const result = fromHome ?? fromAway
-  if (!result || result.status !== 'done') return null
+  if (!result) return null
 
-  const homeScoreNum = parseInt(fromHome ? result.ownScore : result.opponentScore, 10)
-  const awayScoreNum = parseInt(fromHome ? result.opponentScore : result.ownScore, 10)
+  const homeScoreStr = fromHome ? result.ownScore : result.opponentScore
+  const awayScoreStr = fromHome ? result.opponentScore : result.ownScore
+
+  // En vivo: mostramos marcador parcial + clock, sin propagar ganador.
+  if (result.status === 'live') {
+    return { kind: 'live', homeScore: homeScoreStr, awayScore: awayScoreStr, clock: result.clock }
+  }
+
+  // Solo propagamos ganador cuando el partido terminó con resultado válido.
+  if (result.status !== 'done') return null
+
+  const homeScoreNum = parseInt(homeScoreStr, 10)
+  const awayScoreNum = parseInt(awayScoreStr, 10)
   if (isNaN(homeScoreNum) || isNaN(awayScoreNum)) return null
   if (homeScoreNum === awayScoreNum) return null // empate sin penales resueltos aún: no propagar
 
   const winner = homeScoreNum > awayScoreNum ? home : away
   return {
+    kind: 'done',
     winner,
     homeScore: String(homeScoreNum),
     awayScore: String(awayScoreNum),
@@ -138,10 +158,20 @@ function propagateRound(
     const result = resolveMatchResult(match.home.team, match.away.team, knockoutResults)
     if (!result) continue
 
-    // Marcar el resultado en el partido actual para que se muestre el score
+    // En vivo: marcador parcial + clock, SIN propagar ganador (no terminó).
+    if (result.kind === 'live') {
+      match.home.score = result.homeScore
+      match.away.score = result.awayScore
+      match.status = 'live'
+      match.clock = result.clock
+      continue
+    }
+
+    // Finalizado: marcador definitivo + propagar ganador al slot siguiente.
     match.home.score = result.homeScore
     match.away.score = result.awayScore
     match.status = 'done'
+    match.clock = undefined
 
     if (!match.nextMatchId || !match.nextPosition) continue
     const target = updatedNext.find(m => m.id === match.nextMatchId)
@@ -262,7 +292,7 @@ export function buildBracket(matches: Match[], knockoutResults: KnockoutResultsM
   for (const sfMatch of sfFilled) {
     if (!sfMatch.home.team || !sfMatch.away.team) continue
     const result = resolveMatchResult(sfMatch.home.team, sfMatch.away.team, knockoutResults)
-    if (!result) continue
+    if (!result || result.kind !== 'done') continue
     const loser = result.winner.slug === sfMatch.home.team.slug ? sfMatch.away.team : sfMatch.home.team
     const thirdMatch = finalFilled.find(m => m.id === '3RD')
     if (!thirdMatch) continue

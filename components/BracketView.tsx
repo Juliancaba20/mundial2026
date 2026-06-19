@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
+import type { ReactNode } from 'react'
 import Image from 'next/image'
 import type { BracketMatch, BracketRound, BracketSlot, LiveResultsMap, KnockoutResultsMap, Match } from '@/types'
 import { buildBracket, ROUND_LABELS, ROUND_DATES } from '@/lib/bracket'
@@ -74,6 +75,24 @@ function SlotRow({
   )
 }
 
+// ─── Hora local del navegador a partir del kickoff ISO UTC ────────────────────
+// Igual criterio que MatchTime.tsx: usa la TZ del navegador. Evita mismatch
+// SSR/cliente arrancando con null y resolviendo en useEffect.
+function useLocalKickoff(kickoff?: string): { dayLabel: string; time: string } | null {
+  const [value, setValue] = useState<{ dayLabel: string; time: string } | null>(null)
+  useEffect(() => {
+    if (!kickoff) { setValue(null); return }
+    const d = new Date(kickoff)
+    if (isNaN(d.getTime())) { setValue(null); return }
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    setValue({
+      dayLabel: d.toLocaleDateString('es', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' }),
+      time: d.toLocaleTimeString('es', { timeZone: tz, hour: '2-digit', minute: '2-digit' }),
+    })
+  }, [kickoff])
+  return value
+}
+
 // ─── Tarjeta de partido ───────────────────────────────────────────────────────
 function MatchCard({
   match,
@@ -90,13 +109,41 @@ function MatchCard({
 
   const isLive = match.status === 'live'
   const isDone = match.status === 'done'
+  const localTime = useLocalKickoff(match.kickoff)
+
+  // El header refleja el estado del partido:
+  //   live  → badge EN VIVO + clock (ej. "63'")
+  //   done  → "Final"
+  //   pend. → fecha + hora local del navegador (si hay kickoff) o solo fecha
+  let headerContent: ReactNode
+  if (isLive) {
+    headerContent = (
+      <>
+        {match.date}
+        <span className="br-live-badge">EN VIVO{match.clock ? ` ${match.clock}` : ''}</span>
+      </>
+    )
+  } else if (isDone) {
+    headerContent = (
+      <>
+        <span className="br-final-tag">Final</span>
+        {match.date}
+      </>
+    )
+  } else {
+    headerContent = localTime
+      ? (
+        <>
+          {localTime.dayLabel}
+          <span className="br-kickoff-time">{localTime.time} hs</span>
+        </>
+      )
+      : match.date
+  }
 
   return (
-    <div className={`br-match br-scale-${scale}${highlight ? ' br-match-highlight' : ''}${isLive ? ' br-match-live' : ''}`}>
-      <div className="br-match-date">
-        {match.date}
-        {isLive && <span className="br-live-badge">EN VIVO</span>}
-      </div>
+    <div className={`br-match br-scale-${scale}${highlight ? ' br-match-highlight' : ''}${isLive ? ' br-match-live' : ''}${isDone ? ' br-match-done' : ''}`}>
+      <div className="br-match-date">{headerContent}</div>
       <SlotRow
         slot={match.home}
         score={homeScore}

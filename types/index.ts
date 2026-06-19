@@ -55,6 +55,8 @@ export interface BracketMatch {
   id: string
   round: BracketRound
   date: string
+  kickoff?: string   // ISO 8601 UTC — fuente de verdad para hora local en la card
+  clock?: string     // "63'" cuando está en vivo
   home: BracketSlot
   away: BracketSlot
   status: MatchStatus
