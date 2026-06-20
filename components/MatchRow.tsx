@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { Match } from '@/types'
 import { MatchTime } from './MatchTime'
+import { TeamFlag } from './TeamFlag'
 
 interface Props {
   match: Match
@@ -29,12 +30,12 @@ export function MatchRow({ match: m, showGroup = true }: Props) {
       <div className="m-main">
         <div className="m-teams">
           <Link href={`/equipo/${m.home.slug}`} className="m-team">
-            <span className="m-flag">{m.home.flag}</span>
+            <TeamFlag code={m.home.flagCode} name={m.home.name} size={18} className="m-flag-img" />
             <span className="m-tname">{m.home.name}</span>
           </Link>
           {scoreEl}
           <Link href={`/equipo/${m.away.slug}`} className="m-team right">
-            <span className="m-flag">{m.away.flag}</span>
+            <TeamFlag code={m.away.flagCode} name={m.away.name} size={18} className="m-flag-img" />
             <span className="m-tname">{m.away.name}</span>
           </Link>
         </div>

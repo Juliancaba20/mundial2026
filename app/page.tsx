@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Countdown } from '@/components/Countdown'
 import { FeaturedMatchesClient, MatchStripClient } from '@/components/MatchesClient'
 import { BASE_MATCHES, NEWS, TEAMS, FEATURED_TEAM_SLUGS, TEAMS_BY_SLUG } from '@/lib/data'
+import { TeamFlag } from '@/components/TeamFlag'
 
 export const metadata: Metadata = {
   title: 'Copa Mundial FIFA 2026',
@@ -79,7 +80,7 @@ export default function HomePage() {
         <div className="teams-scroll">
           {featuredTeams.map(t => (
             <Link key={t.slug} href={`/equipo/${t.slug}`} className={`team-card${t.isChampion ? ' arg' : ''}`}>
-              <span className="tc-flag">{t.flag}</span>
+              <TeamFlag code={t.flagCode} name={t.name} size={36} className="tc-flag-img" />
               <div className="tc-name">{t.name}</div>
               <div className="tc-group">Grupo {t.group}</div>
               {t.isChampion && <div className="tc-badge">★ Campeona</div>}

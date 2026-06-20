@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { TEAMS, TEAMS_BY_SLUG, BASE_MATCHES } from '@/lib/data'
 import { LiveTeamMatches } from '@/components/LiveTeamMatches'
+import { TeamFlag } from '@/components/TeamFlag'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -20,7 +21,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: team.name,
     description: team.description ?? `${team.name} en el Mundial 2026. Grupo ${team.group}.`,
-    openGraph: { title: `${team.flag} ${team.name} — Mundial 2026` },
+    openGraph: { title: `${team.name} — Mundial 2026` },
   }
 }
 
@@ -49,7 +50,7 @@ export default async function EquipoPage({ params }: Props) {
 
       {/* HERO DEL EQUIPO */}
       <div className="team-hero">
-        <div className="team-flag-lg">{team.flag}</div>
+        <TeamFlag code={team.flagCode} name={team.name} size={64} className="team-flag-lg-img" />
         <div>
           <div className="team-name-lg">{team.name.toUpperCase()}</div>
           <div className="team-meta-row">
@@ -91,7 +92,7 @@ export default async function EquipoPage({ params }: Props) {
                 color: 'var(--text)', textDecoration: 'none', transition: 'border-color .15s',
               }}
             >
-              <span style={{ fontSize: 20 }}>{t.flag}</span>
+              <TeamFlag code={t.flagCode} name={t.name} size={20} style={{ borderRadius: 2 }} />
               {t.name}
             </Link>
           ))}

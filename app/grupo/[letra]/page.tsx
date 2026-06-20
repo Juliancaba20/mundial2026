@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { GROUPS, TEAMS_BY_SLUG, BASE_MATCHES } from '@/lib/data'
 import { LiveGroupStandings } from '@/components/LiveGroupStandings'
+import { TeamFlag } from '@/components/TeamFlag'
 
 interface Props {
   params: Promise<{ letra: string }>
@@ -94,7 +95,7 @@ export default async function GrupoPage({ params }: Props) {
                   transition: 'border-color .15s',
                 } as React.CSSProperties}
               >
-                <span style={{ fontSize: 28, lineHeight: 1 }}>{t.flag}</span>
+                <TeamFlag code={t.flagCode} name={t.name} size={28} style={{ borderRadius: 3, flexShrink: 0 }} />
                 <div>
                   <div style={{ fontSize: 14, fontWeight: full?.isChampion ? 700 : 500 }}>
                     {t.name}

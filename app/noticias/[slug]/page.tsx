@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { NEWS, NEWS_BY_SLUG, TEAMS_BY_SLUG } from '@/lib/data'
+import { TeamFlag } from '@/components/TeamFlag'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -88,7 +89,7 @@ export default async function NoticiaPage({ params }: Props) {
                   color: 'var(--text)', textDecoration: 'none',
                 }}
               >
-                <span style={{ fontSize: 20 }}>{t.flag}</span>
+                <TeamFlag code={t.flagCode} name={t.name} size={20} style={{ borderRadius: 2 }} />
                 {t.name}
               </Link>
             ))}

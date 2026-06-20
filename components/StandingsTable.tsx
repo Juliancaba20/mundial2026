@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { TeamStanding } from '@/lib/standings'
 import { formatDG } from '@/lib/standings'
+import { TeamFlag } from './TeamFlag'
 
 interface Props {
   standings: TeamStanding[]
@@ -43,7 +44,7 @@ export function StandingsTable({ standings, compact = false }: Props) {
               </td>
               <td className="st-team">
                 <Link href={`/equipo/${row.team.slug}`} className="st-team-link">
-                  <span className="st-flag">{row.team.flag}</span>
+                  <TeamFlag code={row.team.flagCode} name={row.team.name} size={16} className="st-flag-img" />
                   <span className="st-name">{row.team.name}</span>
                 </Link>
               </td>

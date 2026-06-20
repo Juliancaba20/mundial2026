@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import type { Match, LiveResultsMap } from '@/types'
 import { BASE_MATCHES } from '@/lib/data'
 import { MatchRow } from './MatchRow'
+import { TeamFlag } from './TeamFlag'
 
 
 type SortMode = 'date' | 'group'
@@ -219,12 +220,12 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
             </div>
             <div className="fm-teams">
               <div className="fm-team">
-                <div className="fm-flag-big">{m.home.flag}</div>
+                <TeamFlag code={m.home.flagCode} name={m.home.name} size={32} className="fm-flag-img" />
                 <div className="fm-team-name">{m.home.name}</div>
               </div>
               {scoreEl}
               <div className="fm-team">
-                <div className="fm-flag-big">{m.away.flag}</div>
+                <TeamFlag code={m.away.flagCode} name={m.away.name} size={32} className="fm-flag-img" />
                 <div className="fm-team-name">{m.away.name}</div>
               </div>
             </div>
@@ -270,16 +271,16 @@ export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }
           {toShow.map(m => (
             <a key={m.id} href="/partidos" className={`hm-card${m.status === 'live' ? ' active-live' : ''}`} style={{textDecoration:'none'}}>
               <div className="hm-team">
-                <span className="hm-flag">{m.home.flag}</span>
-                <span className="hm-name">{m.home.name.split(' ')[0]}</span>
+                <TeamFlag code={m.home.flagCode} name={m.home.name} size={18} className="hm-flag-img" />
+                <span className="hm-name">{m.home.name}</span>
               </div>
               <div className="hm-score-box">
                 <div className={`hm-score${m.status === 'live' ? ' live-score' : ''}`}>{m.score ?? 'vs'}</div>
                 <div className={`hm-time${m.status === 'live' ? ' live-time' : ''}`}>{m.status === 'live' ? m.clock : m.date}</div>
               </div>
               <div className="hm-team right">
-                <span className="hm-flag">{m.away.flag}</span>
-                <span className="hm-name">{m.away.name.split(' ')[0]}</span>
+                <TeamFlag code={m.away.flagCode} name={m.away.name} size={18} className="hm-flag-img" />
+                <span className="hm-name">{m.away.name}</span>
               </div>
             </a>
           ))}

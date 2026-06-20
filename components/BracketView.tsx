@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import type { ReactNode } from 'react'
-import Image from 'next/image'
 import type { BracketMatch, BracketRound, BracketSlot, LiveResultsMap, KnockoutResultsMap, Match } from '@/types'
 import { buildBracket, ROUND_LABELS, ROUND_DATES } from '@/lib/bracket'
 import { BASE_MATCHES } from '@/lib/data'
+import { TeamFlag } from './TeamFlag'
 
 // ─── Aplicar resultados ESPN al array de partidos base ────────────────────────
 function applyResults(matches: Match[], results: LiveResultsMap): Match[] {
@@ -15,24 +15,6 @@ function applyResults(matches: Match[], results: LiveResultsMap): Match[] {
     if (!live) return m
     return { ...m, score: `${live.homeScore} – ${live.awayScore}`, status: live.status, clock: live.clock }
   })
-}
-
-// ─── Bandera real via flagcdn.com ─────────────────────────────────────────────
-function Flag({ code, name, size = 24 }: { code: string; name: string; size?: number }) {
-  const [error, setError] = useState(false)
-  if (error) {
-    return <span style={{ fontSize: size * 0.75, lineHeight: 1 }}>⚽</span>
-  }
-  return (
-    <img
-      src={`https://flagcdn.com/w${size * 2}/${code.toLowerCase()}.png`}
-      alt={name}
-      width={size * 1.5}
-      height={size}
-      style={{ objectFit: 'cover', borderRadius: 2, display: 'block', flexShrink: 0 }}
-      onError={() => setError(true)}
-    />
-  )
 }
 
 // ─── Slot de equipo dentro de un partido ──────────────────────────────────────
@@ -55,12 +37,8 @@ function SlotRow({
       <div className="br-slot-left">
         {hasTeam && slot.team ? (
           <>
-            <Flag code={slot.team.flagCode} name={slot.team.name} size={flagSize} />
-            <span className="br-slot-name">
-              {scale === 'sm'
-                ? slot.team.name.split(' ')[0]  // primera palabra en R32
-                : slot.team.name}
-            </span>
+            <TeamFlag code={slot.team.flagCode} name={slot.team.name} size={flagSize} />
+            <span className="br-slot-name">{slot.team.name}</span>
           </>
         ) : (
           <span className="br-slot-label">{slot.label}</span>
