@@ -18,12 +18,6 @@
   --arg-border:rgba(116,185,255,0.28);
   --display:   'Bebas Neue', Impact, sans-serif;
   --body:      'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-
-  /* Ancho máximo del contenido principal.
-     Única fuente de verdad para los 4 contenedores que limitan el sitio
-     (.hero-content, .hero-match-inner, .home-body, .content-area).
-     Afinar el ancho útil en desktop = editar esta línea.
-     1400px: casi full-bleed en laptops 1440, bracket cabe holgado en monitores. */
   --content-max: 1400px;
 }
 
@@ -35,6 +29,7 @@ body {
   color: var(--text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 a { color: inherit; text-decoration: none; }
 button { font-family: var(--body); cursor: pointer; }
@@ -109,9 +104,9 @@ button { font-family: var(--body); cursor: pointer; }
 .hero-subtitle { font-size: 15px; color: var(--muted); font-weight: 400; margin-bottom: 40px; letter-spacing: .01em; }
 .hero-countdown { display: flex; gap: 24px; margin-bottom: 48px; flex-wrap: wrap; }
 .cd-unit { text-align: center; }
-.cd-num { font-family: var(--display); font-size: 52px; line-height: 1; color: var(--text); letter-spacing: .03em; display: block; min-width: 64px; }
+.cd-num { font-family: var(--display); font-size: 48px; line-height: 1; color: var(--text); letter-spacing: .03em; display: block; min-width: 60px; }
 .cd-label { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 4px; display: block; }
-.cd-sep { font-family: var(--display); font-size: 44px; color: var(--faint); line-height: 1.1; padding-top: 4px; }
+.cd-sep { font-family: var(--display); font-size: 40px; color: var(--faint); line-height: 1.1; padding-top: 4px; }
 .hero-meta { display: flex; gap: 20px; flex-wrap: wrap; }
 .hero-stat { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .hero-stat-num { font-size: 16px; font-weight: 700; color: var(--text); }
@@ -137,34 +132,130 @@ button { font-family: var(--body); cursor: pointer; }
 .hm-time.live-time { color: var(--red); }
 
 /* ── HOME BODY ─────────────────────────────────────────────────────────── */
-.home-body { max-width: var(--content-max); margin: 0 auto; padding: 48px 24px 80px; }
+.home-body { max-width: var(--content-max); margin: 0 auto; padding: 56px 24px 96px; }
+
+/* ── SECTION HEADERS ────────────────────────────────────────────────────── */
 .section-eyebrow { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.section-label { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 10px; }
+.section-label {
+  font-size: 11px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted);
+  display: flex; align-items: center; gap: 10px;
+}
 .section-label::before { content: ''; width: 3px; height: 14px; background: var(--green); border-radius: 2px; display: block; }
+
+/* Sección primaria — mayor protagonismo */
+.section-label.primary {
+  font-size: 13px; color: var(--text); letter-spacing: .06em;
+}
+.section-label.primary::before { height: 18px; width: 4px; }
+
 .section-link { font-size: 12px; color: var(--green); font-weight: 500; cursor: pointer; letter-spacing: .02em; }
 .section-link:hover { opacity: .8; }
 
-/* ── FEATURED MATCHES ──────────────────────────────────────────────────── */
-.featured-matches { display: grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap: 10px; margin-bottom: 48px; }
-.fm-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; cursor: pointer; transition: border-color .2s, transform .15s; position: relative; overflow: hidden; }
+/* Separación entre bloques de la home */
+.home-section { margin-bottom: 72px; }
+.home-section-sm { margin-bottom: 48px; }
+
+/* ── PARTIDO HÉROE ──────────────────────────────────────────────────────── */
+.featured-section { margin-bottom: 72px; }
+
+.match-hero-card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 18px;
+  padding: 28px 32px 24px;
+  margin-bottom: 12px;
+  transition: border-color .2s;
+  overflow: hidden;
+  position: relative;
+}
+.match-hero-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 60% 80% at 50% 0%, rgba(0,168,107,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+.match-hero-card:hover { border-color: rgba(255,255,255,0.22); }
+.match-hero-card.is-live {
+  border-color: rgba(232,0,61,.4);
+  background: linear-gradient(135deg, var(--surface), rgba(232,0,61,0.04));
+}
+.match-hero-card.is-live::before {
+  background: radial-gradient(ellipse 60% 80% at 50% 0%, rgba(232,0,61,0.08) 0%, transparent 70%);
+}
+.match-hero-card.is-done-hero { opacity: .85; }
+
+.mh-top {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 20px;
+}
+.mh-group { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.mh-badge-live {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  color: var(--red); background: var(--red-dim);
+  border-radius: 8px; padding: 4px 10px;
+}
+.mh-badge-done { font-size: 11px; color: var(--muted); background: var(--surface2); border-radius: 8px; padding: 4px 10px; font-weight: 500; }
+.mh-badge-next { font-size: 11px; color: var(--green); background: var(--green-dim); border-radius: 8px; padding: 4px 10px; font-weight: 600; }
+
+.mh-teams {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; margin-bottom: 20px;
+}
+.mh-team {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  gap: 10px; text-align: center;
+}
+.mh-team.right { flex-direction: column; }
+.mh-flag { flex-shrink: 0; }
+.mh-name {
+  font-family: var(--display); font-size: 20px; letter-spacing: .04em;
+  color: var(--text); line-height: 1.1;
+}
+.mh-score-area {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 6px; min-width: 140px; flex-shrink: 0;
+}
+.mh-score {
+  font-family: var(--display); font-size: 72px; letter-spacing: .02em;
+  color: var(--text); line-height: 1;
+}
+.mh-score.live { color: var(--red); }
+.mh-vs {
+  font-family: var(--display); font-size: 32px; letter-spacing: .08em;
+  color: var(--faint); line-height: 1;
+}
+.mh-kickoff-time { font-size: 13px; color: var(--muted); font-weight: 500; }
+.mh-venue { font-size: 12px; color: var(--faint); text-align: center; padding-top: 16px; border-top: 1px solid var(--border); }
+
+/* ── FEATURED MATCHES (cards secundarias) ──────────────────────────────── */
+.featured-matches { display: grid; grid-template-columns: repeat(auto-fill,minmax(240px,1fr)); gap: 8px; }
+.fm-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px; cursor: pointer; transition: border-color .2s, transform .15s;
+  position: relative; overflow: hidden;
+}
 .fm-card:hover { border-color: var(--border2); transform: translateY(-1px); }
 .fm-card.is-live { border-color: rgba(232,0,61,.35); background: linear-gradient(135deg, var(--surface), var(--red-dim)); }
-.fm-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.fm-card.is-done-card { opacity: .65; }
+.fm-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .fm-group { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .fm-badge-live { font-size: 10px; font-weight: 700; letter-spacing: .06em; color: var(--red); background: var(--red-dim); border-radius: 6px; padding: 3px 8px; display: flex; align-items: center; gap: 5px; }
 .fm-badge-done { font-size: 10px; color: var(--muted); background: var(--surface2); border-radius: 6px; padding: 3px 8px; font-weight: 500; }
 .fm-badge-next { font-size: 10px; color: var(--green); background: var(--green-dim); border-radius: 6px; padding: 3px 8px; font-weight: 600; }
 .fm-teams { display: flex; align-items: center; }
-.fm-team { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0; }
+.fm-team { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px 0; }
 .fm-flag-img { flex-shrink: 0; }
-.fm-team-name { font-size: 12px; color: var(--muted); font-weight: 500; text-align: center; word-break: break-word; }
-.fm-score-center { min-width: 64px; text-align: center; font-family: var(--display); font-size: 36px; letter-spacing: .04em; color: var(--text); line-height: 1; padding: 0 8px; }
+.fm-team-name { font-size: 11px; color: var(--muted); font-weight: 500; text-align: center; word-break: break-word; }
+.fm-score-center { min-width: 56px; text-align: center; font-family: var(--display); font-size: 32px; letter-spacing: .04em; color: var(--text); line-height: 1; padding: 0 6px; }
 .fm-score-center.live { color: var(--red); }
-.fm-score-center.pending { font-size: 14px; color: var(--faint); font-family: var(--body); font-weight: 400; padding-top: 4px; }
-.fm-venue { font-size: 11px; color: var(--faint); text-align: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.fm-score-center.pending { font-size: 13px; color: var(--faint); font-family: var(--body); font-weight: 400; padding-top: 4px; }
+.fm-venue { font-size: 10px; color: var(--faint); text-align: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 
 /* ── NEWS ──────────────────────────────────────────────────────────────── */
-.news-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin-bottom: 48px; }
+.news-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
 .news-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; cursor: pointer; transition: border-color .2s; }
 .news-card:hover { border-color: var(--border2); }
 .news-card.featured { grid-row: span 2; }
@@ -177,13 +268,13 @@ button { font-family: var(--body); cursor: pointer; }
 .news-meta { font-size: 11px; color: var(--muted); }
 
 /* ── TEAMS SCROLL ──────────────────────────────────────────────────────── */
-.teams-scroll { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 48px; -ms-overflow-style: none; scrollbar-width: none; }
+.teams-scroll { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; -ms-overflow-style: none; scrollbar-width: none; }
 .teams-scroll::-webkit-scrollbar { display: none; }
-.team-card { flex-shrink: 0; width: 140px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 16px; text-align: center; cursor: pointer; transition: border-color .2s, transform .15s; }
+.team-card { flex-shrink: 0; width: 130px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 14px; text-align: center; cursor: pointer; transition: border-color .2s, transform .15s; }
 .team-card:hover { border-color: var(--border2); transform: translateY(-2px); }
 .team-card.arg { border-color: var(--arg-border); background: var(--arg); }
 .tc-flag-img { display: block; margin: 0 auto 10px; }
-.tc-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; word-break: break-word; }
+.tc-name { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px; word-break: break-word; }
 .tc-group { font-size: 11px; color: var(--muted); }
 .tc-badge { display: inline-block; font-size: 10px; font-weight: 600; color: var(--gold); background: var(--gold-dim); border-radius: 6px; padding: 2px 7px; margin-top: 6px; }
 
@@ -191,9 +282,35 @@ button { font-family: var(--body); cursor: pointer; }
 .content-area { max-width: var(--content-max); margin: 0 auto; padding: 28px 24px 80px; }
 
 /* ── PAGE HEADER ───────────────────────────────────────────────────────── */
-.page-header { margin-bottom: 24px; }
+.page-header { margin-bottom: 28px; }
 .page-title { font-family: var(--display); font-size: 42px; letter-spacing: .04em; color: var(--text); line-height: 1; }
-.page-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.page-sub { font-size: 13px; color: var(--muted); margin-top: 6px; }
+
+/* ── PAGE HEADER CON ACENTO DE SECCIÓN ─────────────────────────────────── */
+.page-header-accent {
+  display: flex; align-items: flex-start; gap: 16px;
+  margin-bottom: 28px; padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.page-header-stripe {
+  width: 4px; border-radius: 2px; flex-shrink: 0; margin-top: 6px; align-self: stretch; min-height: 40px;
+}
+.page-header-inner { flex: 1; min-width: 0; }
+
+/* ── SUBPAGE NAV (breadcrumb/back siempre arriba centrado) ──────────────── */
+.subpage-nav {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 16px 24px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.back-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--muted); transition: color .15s;
+}
+.back-link:hover { color: var(--green); }
 
 /* ── GROUPS ────────────────────────────────────────────────────────────── */
 .groups-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(268px,1fr)); gap: 10px; }
@@ -278,8 +395,6 @@ button { font-family: var(--body); cursor: pointer; }
 .article-body { font-size: 15px; color: var(--text); line-height: 1.8; max-width: 700px; }
 .article-body p { margin-bottom: 20px; }
 .article-body strong, .article-body b { font-weight: 600; color: var(--text); }
-.back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); margin-bottom: 24px; transition: color .15s; }
-.back-link:hover { color: var(--green); }
 
 /* ── API ERROR ─────────────────────────────────────────────────────────── */
 .api-error { background: rgba(232,0,61,.08); border: 1px solid rgba(232,0,61,.2); border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #ff8fa3; margin-bottom: 16px; }
@@ -297,17 +412,26 @@ button { font-family: var(--body); cursor: pointer; }
   .hero-content { padding: 60px 16px 44px; }
   .hero-title { font-size: clamp(48px,14vw,80px); }
   .hero-countdown { gap: 16px; }
-  .cd-num { font-size: 40px; }
+  .cd-num { font-size: 36px; }
   .home-body, .content-area { padding-left: 16px; padding-right: 16px; }
   .news-grid { grid-template-columns: 1fr; }
   .news-card.featured { grid-row: auto; }
   .m-venue-s { display: none; }
   .team-hero { flex-direction: column; align-items: flex-start; }
+  .mh-teams { flex-direction: column; gap: 12px; }
+  .mh-score-area { order: -1; }
+  .mh-score { font-size: 56px; }
+  .mh-name { font-size: 16px; }
+  .match-hero-card { padding: 20px 20px 18px; }
+  .home-section { margin-bottom: 52px; }
+  .subpage-nav { padding: 12px 16px 0; }
 }
 @media (max-width: 480px) {
   .hero-countdown { gap: 10px; }
-  .cd-num { font-size: 34px; min-width: 50px; }
-  .cd-sep { font-size: 30px; }
+  .cd-num { font-size: 30px; min-width: 44px; }
+  .cd-sep { font-size: 26px; }
+  .mh-score { font-size: 44px; }
+  .featured-matches { grid-template-columns: 1fr 1fr; }
 }
 
 /* ── STANDINGS TABLE ───────────────────────────────────────────────────────── */
@@ -398,13 +522,11 @@ button { font-family: var(--body); cursor: pointer; }
   padding: 8px 4px 0;
 }
 
-/* compact variant (grilla de /grupos — tabla sin GF/GC) */
+/* compact variant */
 .g-card .standings-wrap { padding: 0 2px 8px; }
 .g-card .standings-table th,
 .g-card .standings-table .st-num { padding: 6px 5px; font-size: 12px; }
 .g-card .st-name { font-size: 12px; }
-/* En la grilla compacta el flag es un círculo cuadrado: igual ancho que alto.
-   El TeamFlag ya impone border-radius:50%, aquí solo ajustamos el tamaño. */
 .g-card .st-flag-img { width: 16px; height: 16px; }
 .g-card .st-legend { padding: 6px 4px 2px; font-size: 10px; }
 
@@ -428,7 +550,6 @@ button { font-family: var(--body); cursor: pointer; }
   font-size: 12px; color: var(--muted);
 }
 
-/* ── MATCH CARD ──────────────────────────────────────────────────────────── */
 .br-match {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -460,7 +581,6 @@ button { font-family: var(--body); cursor: pointer; }
   background: var(--red-dim); border-radius: 4px; padding: 1px 5px;
   letter-spacing: .04em;
 }
-/* Estados del header de fecha en MatchCard */
 .br-final-tag {
   font-size: 9px; font-weight: 700; color: var(--green);
   background: rgba(0,168,107,.12); border-radius: 4px; padding: 1px 5px;
@@ -497,10 +617,6 @@ button { font-family: var(--body); cursor: pointer; }
 .br-empty { opacity: .55; }
 .br-divider { height: 1px; background: var(--border); margin: 0; }
 
-/* ── JERARQUÍA POR RONDA ──────────────────────────────────────────────────
-   El tamaño y peso visual de la card crece progresivamente desde 16avos
-   hasta la Final, para que el ojo entienda de inmediato qué ronda pesa más,
-   igual que en FIFA/ESPN/Sofascore. */
 .br-scale-sm { min-width: 168px; }
 .br-scale-sm .br-slot { padding: 6px 9px; min-height: 30px; }
 .br-scale-sm .br-slot-name { font-size: 11.5px; }
@@ -521,13 +637,9 @@ button { font-family: var(--body); cursor: pointer; }
 .br-scale-xl .br-match-date { font-size: 10px; padding: 7px 14px 6px; }
 .br-scale-xl.br-match { border-radius: 12px; }
 
-/* ── DESKTOP BRACKET ─────────────────────────────────────────────────────── */
 .br-desktop { display: block; }
 .br-mobile  { display: none; }
 
-/* El bracket fluye con la página: NO hay scroll vertical interno ni altura
-   máxima que genere caja propia. El scroll horizontal solo aparece cuando el
-   ancho del árbol excede el viewport. */
 .br-scroll-container {
   overflow-x: auto;
   overflow-y: visible;
@@ -572,14 +684,12 @@ button { font-family: var(--body); cursor: pointer; }
 }
 .br-round-date { font-size: 10px; color: var(--faint); margin-top: 2px; }
 
-/* Fase 4 — columna futura: atenúa cards, conectores y bloquea hover */
 .br-round-col.br-round-future .br-round-name,
 .br-round-col.br-round-future .br-round-date { opacity: .45; }
 .br-round-col.br-round-future .br-match { opacity: .45; pointer-events: none; }
 .br-round-col.br-round-future .br-connector { opacity: .3; }
 .br-round-col.br-round-future .br-sf-connector { opacity: .3; }
 
-/* Fase 5 — conector iluminado: verde cuando el ganador ya avanzó */
 .br-connector { transition: color .3s; }
 .br-sf-connector { transition: background .3s; }
 .br-connector-done { color: var(--green) !important; }
@@ -590,10 +700,6 @@ button { font-family: var(--body); cursor: pointer; }
   flex: 1;
 }
 
-/* Cada partido se posiciona en su centro vertical exacto, calculado en JS
-   a partir de la unidad geométrica común al árbol entero (ver UNIT en TSX).
-   Esto reemplaza el viejo `justify-content: space-around`, que solo
-   aproximaba la posición y producía conectores desalineados. */
 .br-match-wrapper {
   position: absolute;
   left: 0; right: 0;
@@ -602,9 +708,6 @@ button { font-family: var(--body); cursor: pointer; }
 }
 .br-match-wrapper > .br-match { position: relative; z-index: 1; }
 
-/* Conectores SVG — calzan exactamente con el centro de la card en ambos
-   extremos porque comparten la misma unidad de medida que el posicionamiento
-   de las cards (ver RoundColumn en BracketView.tsx). */
 .br-connector {
   position: absolute;
   top: 50%;
@@ -615,10 +718,6 @@ button { font-family: var(--body); cursor: pointer; }
 .br-connector-left { left: 100%; }
 .br-connector-right { right: 100%; }
 
-/* ── FINAL SECTION (centro del bracket) ─────────────────────────────────── */
-/* br-final-col actúa como columna estándar del flex tree, con la misma
-   altura que el resto, y br-final-section se posiciona absolutamente
-   en el centro exacto — el mismo punto donde llegan los conectores SF. */
 .br-final-col {
   display: flex; flex-direction: column;
   width: 248px; flex-shrink: 0;
@@ -644,9 +743,6 @@ button { font-family: var(--body); cursor: pointer; }
 }
 .br-final-date { font-size: 10px; color: var(--faint); text-align: center; }
 
-/* Línea horizontal que conecta la card SF con el borde de la columna Final.
-   Sustituye el codo SVG que se usaba en rondas anteriores — SF conecta
-   directamente al centro del árbol, sin doblar hacia arriba o abajo. */
 .br-sf-connector {
   position: absolute; top: 50%;
   width: 28px; height: 1.5px;
@@ -657,7 +753,6 @@ button { font-family: var(--body); cursor: pointer; }
 .br-sf-connector-left  { left: 100%; }
 .br-sf-connector-right { right: 100%; }
 
-/* ── MOBILE ──────────────────────────────────────────────────────────────── */
 .br-mobile-tabs {
   display: flex; gap: 4px; overflow-x: auto;
   padding-bottom: 4px; margin-bottom: 16px;
@@ -690,10 +785,9 @@ button { font-family: var(--body); cursor: pointer; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   MATCH TIME + UPDATED MATCH ROW
+   MATCH TIME + MATCH ROW
 ══════════════════════════════════════════════════════════════════════════════ */
 
-/* ── Match row — layout actualizado ──────────────────────────────────────── */
 .match-row {
   flex-direction: column;
   align-items: stretch;
@@ -707,7 +801,6 @@ button { font-family: var(--body); cursor: pointer; }
   flex-wrap: wrap; padding-left: 2px;
 }
 
-/* Restaurar layout de fila horizontal en desktop */
 @media (min-width: 600px) {
   .match-row {
     flex-direction: row;
@@ -718,7 +811,6 @@ button { font-family: var(--body); cursor: pointer; }
   .m-main { gap: 3px; padding: 10px 0; }
 }
 
-/* Estadio */
 .m-stadium {
   font-size: 11px; color: var(--faint);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -726,7 +818,6 @@ button { font-family: var(--body); cursor: pointer; }
 }
 .m-stadium::before { content: '·'; margin-right: 6px; }
 
-/* ── MatchTime — estado PENDING ───────────────────────────────────────────── */
 .mt-pending {
   display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
 }
@@ -751,7 +842,6 @@ button { font-family: var(--body); cursor: pointer; }
   50%       { opacity: .6; }
 }
 
-/* ── MatchTime — estado LIVE ─────────────────────────────────────────────── */
 .mt-live {
   display: flex; align-items: center; gap: 5px;
 }
@@ -769,7 +859,6 @@ button { font-family: var(--body); cursor: pointer; }
   font-variant-numeric: tabular-nums;
 }
 
-/* ── MatchTime — estado DONE ─────────────────────────────────────────────── */
 .mt-done {
   display: flex; align-items: center; gap: 5px;
 }
@@ -779,14 +868,14 @@ button { font-family: var(--body); cursor: pointer; }
 }
 .mt-done-date { font-size: 11px; color: var(--faint); }
 
-/* ── Match row: estado finalizado más apagado ────────────────────────────── */
+/* Partidos finalizados — menos contraste para destacar los relevantes */
 .match-row.is-done {
-  opacity: .8;
+  opacity: .62;
 }
 .match-row.is-done .m-tname { color: var(--muted); }
 .match-row.is-done .m-score-box { color: var(--text); font-weight: 600; }
+.match-row.is-done:hover { opacity: .85; border-color: var(--border2); }
 
-/* ── Ocultar badge derecho viejo (lo reemplaza MatchTime) ───────────────── */
 .m-right { display: none; }
 
 @media (max-width: 599px) {

@@ -9,10 +9,13 @@ export const metadata: Metadata = {
 export default function EliminatoriasPage() {
   return (
     <div className="content-area">
-      <div className="page-header">
-        <div className="page-title">ELIMINATORIAS</div>
-        <div className="page-sub">
-          32 equipos · 5 rondas · Final 19 jul, MetLife Stadium, Nueva York/NJ
+      <div className="page-header-accent">
+        <div className="page-header-stripe" style={{ background: '#C9A84C' }} />
+        <div className="page-header-inner">
+          <div className="page-title">ELIMINATORIAS</div>
+          <div className="page-sub">
+            32 equipos · 5 rondas · Final 19 jul, MetLife Stadium, Nueva York/NJ
+          </div>
         </div>
       </div>
       <BracketView />

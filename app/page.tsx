@@ -43,49 +43,55 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* MATCH STRIP — client island */}
+      {/* MATCH STRIP */}
       <MatchStripClient initialMatches={BASE_MATCHES} />
 
       <div className="home-body">
 
-        {/* PARTIDOS DESTACADOS */}
-        <div className="section-eyebrow">
-          <div className="section-label">Partidos destacados</div>
-          <Link href="/partidos" className="section-link">Ver todos →</Link>
+        {/* PARTIDOS DESTACADOS — sección primaria */}
+        <div className="home-section">
+          <div className="section-eyebrow">
+            <div className="section-label primary">Partidos destacados</div>
+            <Link href="/partidos" className="section-link">Ver todos →</Link>
+          </div>
+          <FeaturedMatchesClient initialMatches={BASE_MATCHES} />
         </div>
-        <FeaturedMatchesClient initialMatches={BASE_MATCHES} />
 
         {/* NOTICIAS */}
-        <div className="section-eyebrow">
-          <div className="section-label">Noticias del torneo</div>
-        </div>
-        <div className="news-grid">
-          {NEWS.map(article => (
-            <Link key={article.slug} href={`/noticias/${article.slug}`} className={`news-card${article.featured ? ' featured' : ''}`}>
-              <div className="news-img">{article.emoji}</div>
-              <div className="news-body">
-                <div className="news-tag">{article.tag}</div>
-                <div className="news-headline">{article.headline}</div>
-                <div className="news-meta">{article.date}</div>
-              </div>
-            </Link>
-          ))}
+        <div className="home-section">
+          <div className="section-eyebrow">
+            <div className="section-label">Noticias del torneo</div>
+          </div>
+          <div className="news-grid">
+            {NEWS.map(article => (
+              <Link key={article.slug} href={`/noticias/${article.slug}`} className={`news-card${article.featured ? ' featured' : ''}`}>
+                <div className="news-img">{article.emoji}</div>
+                <div className="news-body">
+                  <div className="news-tag">{article.tag}</div>
+                  <div className="news-headline">{article.headline}</div>
+                  <div className="news-meta">{article.date}</div>
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
 
         {/* SELECCIONES DESTACADAS */}
-        <div className="section-eyebrow" style={{ marginTop: 48 }}>
-          <div className="section-label">Selecciones destacadas</div>
-          <Link href="/grupos" className="section-link">Ver grupos →</Link>
-        </div>
-        <div className="teams-scroll">
-          {featuredTeams.map(t => (
-            <Link key={t.slug} href={`/equipo/${t.slug}`} className={`team-card${t.isChampion ? ' arg' : ''}`}>
-              <TeamFlag code={t.flagCode} name={t.name} size={36} className="tc-flag-img" />
-              <div className="tc-name">{t.name}</div>
-              <div className="tc-group">Grupo {t.group}</div>
-              {t.isChampion && <div className="tc-badge">★ Campeona</div>}
-            </Link>
-          ))}
+        <div className="home-section-sm">
+          <div className="section-eyebrow">
+            <div className="section-label">Selecciones destacadas</div>
+            <Link href="/grupos" className="section-link">Ver grupos →</Link>
+          </div>
+          <div className="teams-scroll">
+            {featuredTeams.map(t => (
+              <Link key={t.slug} href={`/equipo/${t.slug}`} className={`team-card${t.isChampion ? ' arg' : ''}`}>
+                <TeamFlag code={t.flagCode} name={t.name} size={36} className="tc-flag-img" />
+                <div className="tc-name">{t.name}</div>
+                <div className="tc-group">Grupo {t.group}</div>
+                {t.isChampion && <div className="tc-badge">★ Campeona</div>}
+              </Link>
+            ))}
+          </div>
         </div>
 
       </div>

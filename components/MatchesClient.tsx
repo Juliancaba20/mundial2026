@@ -18,9 +18,6 @@ function applyResults(matches: Match[], results: LiveResultsMap): Match[] {
   })
 }
 
-// Convierte un kickoff ISO UTC a la etiqueta de fecha local del navegador.
-// Mismo criterio que MatchTime.tsx para evitar discrepancias de día.
-// Ej: "2026-06-18T02:00:00Z" en Buenos Aires (UTC-3) → "17 jun"
 function getLocalDateLabel(kickoff: string): string {
   const d = new Date(kickoff)
   if (isNaN(d.getTime())) return ''
@@ -33,7 +30,7 @@ function getLocalDateLabel(kickoff: string): string {
 }
 
 interface Props {
-  groupFilter?: string  // si viene de la página de grupo
+  groupFilter?: string
 }
 
 export function MatchesClient({ groupFilter }: Props) {
@@ -43,10 +40,6 @@ export function MatchesClient({ groupFilter }: Props) {
   const [statusText, setStatusText] = useState('Cargando resultados…')
   const [apiError, setApiError] = useState(false)
   const [hasLive, setHasLive] = useState(false)
-
-  // Mapa matchId → etiqueta de fecha local del navegador.
-  // Empieza vacío (SSR/hidratación) y se rellena en el primer useEffect.
-  // Mientras esté vacío, el fallback es m.date (UTC), igual que MatchTime.
   const [localDateMap, setLocalDateMap] = useState<Record<string, string>>({})
 
   const fetchResults = useCallback(async () => {
@@ -62,7 +55,6 @@ export function MatchesClient({ groupFilter }: Props) {
       setApiError(false)
       const time = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
       setStatusText(`Actualizado ${time} · ${doneCount} resultado${doneCount !== 1 ? 's' : ''} cargado${doneCount !== 1 ? 's' : ''}`)
-      // Actualizar indicador del topbar
       const topbarLive = document.getElementById('topbar-live')
       if (topbarLive) topbarLive.style.display = liveCount > 0 ? 'flex' : 'none'
     } catch {
@@ -72,24 +64,19 @@ export function MatchesClient({ groupFilter }: Props) {
   }, [])
 
   useEffect(() => {
-    // Calcular fechas locales una sola vez al montar (solo corre en el cliente)
     const map: Record<string, string> = {}
     for (const m of BASE_MATCHES) {
       map[m.id] = getLocalDateLabel(m.kickoff)
     }
     setLocalDateMap(map)
-
     fetchResults()
-    // Polling cada 60 segundos si hay partidos en vivo
     const id = setInterval(fetchResults, 60_000)
     return () => clearInterval(id)
   }, [fetchResults])
 
   const list = matches.filter(m => !selectedGroup || m.group === selectedGroup)
-
   const groupLetters = 'ABCDEFGHIJKL'.split('')
 
-  // Obtiene la etiqueta de fecha para agrupar: local si ya hidrató, UTC como fallback
   function dateLabel(m: Match): string {
     return localDateMap[m.id] || m.date
   }
@@ -98,14 +85,11 @@ export function MatchesClient({ groupFilter }: Props) {
     if (!list.length) return <div style={{ textAlign:'center', padding:'48px', color:'var(--faint)', fontSize:14 }}>No hay partidos para este grupo.</div>
 
     if (sortMode === 'date') {
-      // Construir lista de días únicos preservando el orden cronológico (dateSort)
       const sorted = [...list].sort((a, b) => {
-        // Primero por fecha, luego por hora exacta dentro del día
         if (a.dateSort !== b.dateSort) return a.dateSort - b.dateSort
         return new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
       })
 
-      // Días únicos en orden de aparición (ya ordenados arriba)
       const days: string[] = []
       const seen = new Set<string>()
       for (const m of sorted) {
@@ -181,7 +165,7 @@ export function MatchesClient({ groupFilter }: Props) {
   )
 }
 
-// ── Versión compacta para la home ────────────────────────────────────────────
+// ── Partido héroe + cards secundarias para la home ───────────────────────────
 export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Match[] }) {
   const [matches, setMatches] = useState<Match[]>(initialMatches)
 
@@ -195,44 +179,106 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
   }, [initialMatches])
 
   const live = matches.filter(m => m.status === 'live')
-  const done = matches.filter(m => m.status === 'done').slice(-3)
-  const upcoming = matches.filter(m => m.status === 'pending').slice(0, 3)
-  const picks = [...live.slice(0, 2), ...done, ...upcoming].slice(0, 6)
+  const done = matches.filter(m => m.status === 'done')
+  const upcoming = matches.filter(m => m.status === 'pending')
+
+  // Partido héroe: prioridad live > próximo inmediato > último finalizado
+  const hero = live[0] ?? upcoming[0] ?? done[done.length - 1] ?? null
+
+  // Cards secundarias: excluye el héroe, max 5
+  const secondary = matches
+    .filter(m => m.id !== hero?.id)
+    .filter(m => {
+      if (live.length) return m.status === 'live' || m.status === 'pending'
+      return m.status === 'pending' || m.status === 'done'
+    })
+    .slice(0, 5)
+
+  function HeroCard({ m }: { m: Match }) {
+    const isLive = m.status === 'live'
+    const isDone = m.status === 'done'
+    const scoreText = m.status === 'pending' ? null : m.score
+
+    return (
+      <a href="/partidos" className={`match-hero-card${isLive ? ' is-live' : ''}${isDone ? ' is-done-hero' : ''}`} style={{ textDecoration: 'none' }}>
+        <div className="mh-top">
+          <span className="mh-group">Grupo {m.group}</span>
+          {isLive && (
+            <span className="mh-badge-live"><span className="live-dot" style={{ width: 6, height: 6 }} /> EN VIVO {m.clock}</span>
+          )}
+          {isDone && <span className="mh-badge-done">Partido finalizado</span>}
+          {!isLive && !isDone && <span className="mh-badge-next">Próximo · {m.date}</span>}
+        </div>
+
+        <div className="mh-teams">
+          <div className="mh-team">
+            <TeamFlag code={m.home.flagCode} name={m.home.name} size={48} className="mh-flag" />
+            <span className="mh-name">{m.home.name}</span>
+          </div>
+
+          <div className="mh-score-area">
+            {scoreText
+              ? <div className={`mh-score${isLive ? ' live' : ''}`}>{scoreText}</div>
+              : <div className="mh-vs">VS</div>
+            }
+            {!isLive && !isDone && m.kickoff && (
+              <div className="mh-kickoff-time">
+                {new Date(m.kickoff).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}
+              </div>
+            )}
+          </div>
+
+          <div className="mh-team right">
+            <TeamFlag code={m.away.flagCode} name={m.away.name} size={48} className="mh-flag" />
+            <span className="mh-name">{m.away.name}</span>
+          </div>
+        </div>
+
+        <div className="mh-venue">{m.venue}</div>
+      </a>
+    )
+  }
 
   return (
-    <div className="featured-matches">
-      {picks.map(m => {
-        const badge = m.status === 'live'
-          ? <div className="fm-badge-live"><span className="live-dot" style={{width:5,height:5}} />EN VIVO {m.clock}</div>
-          : m.status === 'done'
-            ? <div className="fm-badge-done">Final</div>
-            : <div className="fm-badge-next">Próximo · {m.date}</div>
+    <div className="featured-section">
+      {hero && <HeroCard m={hero} />}
 
-        const scoreEl = m.status === 'pending'
-          ? <div className="fm-score-center pending">vs</div>
-          : <div className={`fm-score-center${m.status === 'live' ? ' live' : ''}`}>{m.score}</div>
+      {secondary.length > 0 && (
+        <div className="featured-matches">
+          {secondary.map(m => {
+            const badge = m.status === 'live'
+              ? <div className="fm-badge-live"><span className="live-dot" style={{width:5,height:5}} />EN VIVO {m.clock}</div>
+              : m.status === 'done'
+                ? <div className="fm-badge-done">Final</div>
+                : <div className="fm-badge-next">Próximo · {m.date}</div>
 
-        return (
-          <a key={m.id} href={`/partidos`} className={`fm-card${m.status === 'live' ? ' is-live' : ''}`} style={{textDecoration:'none'}}>
-            <div className="fm-top">
-              <span className="fm-group">Grupo {m.group}</span>
-              {badge}
-            </div>
-            <div className="fm-teams">
-              <div className="fm-team">
-                <TeamFlag code={m.home.flagCode} name={m.home.name} size={32} className="fm-flag-img" />
-                <div className="fm-team-name">{m.home.name}</div>
-              </div>
-              {scoreEl}
-              <div className="fm-team">
-                <TeamFlag code={m.away.flagCode} name={m.away.name} size={32} className="fm-flag-img" />
-                <div className="fm-team-name">{m.away.name}</div>
-              </div>
-            </div>
-            <div className="fm-venue">{m.venue}</div>
-          </a>
-        )
-      })}
+            const scoreEl = m.status === 'pending'
+              ? <div className="fm-score-center pending">vs</div>
+              : <div className={`fm-score-center${m.status === 'live' ? ' live' : ''}`}>{m.score}</div>
+
+            return (
+              <a key={m.id} href="/partidos" className={`fm-card${m.status === 'live' ? ' is-live' : ''}${m.status === 'done' ? ' is-done-card' : ''}`} style={{textDecoration:'none'}}>
+                <div className="fm-top">
+                  <span className="fm-group">Grupo {m.group}</span>
+                  {badge}
+                </div>
+                <div className="fm-teams">
+                  <div className="fm-team">
+                    <TeamFlag code={m.home.flagCode} name={m.home.name} size={28} className="fm-flag-img" />
+                    <div className="fm-team-name">{m.home.name}</div>
+                  </div>
+                  {scoreEl}
+                  <div className="fm-team">
+                    <TeamFlag code={m.away.flagCode} name={m.away.name} size={28} className="fm-flag-img" />
+                    <div className="fm-team-name">{m.away.name}</div>
+                  </div>
+                </div>
+                <div className="fm-venue">{m.venue}</div>
+              </a>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

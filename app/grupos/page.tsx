@@ -21,10 +21,13 @@ export default async function GruposPage() {
 
   return (
     <div className="content-area">
-      <div className="page-header">
-        <div className="page-title">GRUPOS</div>
-        <div className="page-sub">
-          12 grupos · tabla de posiciones en tiempo real · clasifican los 2 primeros + 8 mejores terceros
+      <div className="page-header-accent">
+        <div className="page-header-stripe" style={{ background: '#00A86B' }} />
+        <div className="page-header-inner">
+          <div className="page-title">GRUPOS</div>
+          <div className="page-sub">
+            12 grupos · tabla de posiciones en tiempo real · clasifican los 2 primeros + 8 mejores terceros
+          </div>
         </div>
       </div>
 
@@ -33,8 +36,6 @@ export default async function GruposPage() {
           const fullTeams = group.teams.map(t => TEAMS_BY_SLUG[t.slug])
           const hasChamp = fullTeams.some(t => t?.isChampion)
           const color = GROUP_COLORS[gi]
-          // Posiciones calculadas con los resultados reales de ESPN ya aplicados
-          // (misma fuente de datos que usa /grupo/[letra])
           const standings = calculateStandings(group.letter, matches)
 
           return (
@@ -51,8 +52,6 @@ export default async function GruposPage() {
                   Ver en vivo →
                 </Link>
               </div>
-
-              {/* TABLA DE POSICIONES COMPACTA */}
               <StandingsTable standings={standings} compact={true} />
             </div>
           )
