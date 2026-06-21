@@ -16,7 +16,7 @@ function teamSlot(team: TeamRef, label: string): BracketSlot {
 // De los 12 terceros de cada grupo, clasifican los 8 mejores
 // Criterio: pts → dg → gf → orden alfabético
 
-function getBestThirds(matches: Match[]): Array<{ group: string; team: TeamRef | null }> {
+export function getBestThirds(matches: Match[]): Array<{ group: string; team: TeamRef | null }> {
   const thirds: Array<{ group: string; team: TeamRef | null; pts: number; dg: number; gf: number }> = []
 
   for (const letter of 'ABCDEFGHIJKL'.split('')) {

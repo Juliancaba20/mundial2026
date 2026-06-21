@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { GROUPS, TEAMS_BY_SLUG, BASE_MATCHES } from '@/lib/data'
 import { calculateStandings } from '@/lib/standings'
 import { applyResults, fetchLiveResults } from '@/lib/espn'
+import { getBestThirds } from '@/lib/bracket'
 import { StandingsTable } from '@/components/StandingsTable'
 
 export const metadata: Metadata = {
@@ -15,9 +16,21 @@ const GROUP_COLORS = [
   '#059669','#db2777','#64748b','#C9A84C','#16a34a','#6366f1',
 ]
 
+function computeQualifiedThirds(matches: ReturnType<typeof applyResults>): { slugs: Set<string>; resolved: boolean } {
+  const thirds = getBestThirds(matches)
+  const groupsComplete = 'ABCDEFGHIJKL'.split('').every(letter => {
+    const s = calculateStandings(letter, matches)
+    return s.length === 4 && s.every(row => row.pj === 3)
+  })
+  const top8 = thirds.slice(0, 8)
+  const slugs = new Set(top8.map(t => t.team?.slug).filter(Boolean) as string[])
+  return { slugs, resolved: groupsComplete }
+}
+
 export default async function GruposPage() {
   const { results: liveResults } = await fetchLiveResults()
   const matches = applyResults(BASE_MATCHES, liveResults)
+  const { slugs: qualifiedThirdSlugs, resolved: thirdsResolved } = computeQualifiedThirds(matches)
 
   return (
     <div className="content-area">
@@ -52,7 +65,12 @@ export default async function GruposPage() {
                   Ver en vivo →
                 </Link>
               </div>
-              <StandingsTable standings={standings} compact={true} />
+              <StandingsTable
+                standings={standings}
+                compact={true}
+                qualifiedThirdSlugs={qualifiedThirdSlugs}
+                thirdsResolved={thirdsResolved}
+              />
             </div>
           )
         })}

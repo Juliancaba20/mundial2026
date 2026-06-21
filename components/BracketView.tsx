@@ -54,8 +54,6 @@ function SlotRow({
 }
 
 // ─── Hora local del navegador a partir del kickoff ISO UTC ────────────────────
-// Igual criterio que MatchTime.tsx: usa la TZ del navegador. Evita mismatch
-// SSR/cliente arrancando con null y resolviendo en useEffect.
 function useLocalKickoff(kickoff?: string): { dayLabel: string; time: string } | null {
   const [value, setValue] = useState<{ dayLabel: string; time: string } | null>(null)
   useEffect(() => {
@@ -89,10 +87,6 @@ function MatchCard({
   const isDone = match.status === 'done'
   const localTime = useLocalKickoff(match.kickoff)
 
-  // El header refleja el estado del partido:
-  //   live  → badge EN VIVO + clock (ej. "63'")
-  //   done  → "Final"
-  //   pend. → fecha + hora local del navegador (si hay kickoff) o solo fecha
   let headerContent: ReactNode
   if (isLive) {
     headerContent = (
@@ -139,253 +133,213 @@ function MatchCard({
   )
 }
 
-// ─── Geometría del árbol ───────────────────────────────────────────────────────
-// Unidad base = altura efectiva (card + gap) de un partido de 16avos (R32).
-// Cada ronda siguiente tiene el doble de altura por partido que la anterior,
-// y cada card se centra exactamente entre sus dos alimentadores de la ronda
-// previa. Esto reemplaza `space-around` (aproximado) por posiciones calculadas
-// (exactas), que es lo que permite que los conectores SVG calcen sin errores.
-const UNIT = 88 // alto de slot en R32, en px — ajustá esto si cambia el tamaño de card
-
-// Cuántos "slots" de R32 ocupa una ronda determinada (R32=1, R16=2, QF=4, SF=8)
-const ROUND_SPAN: Record<BracketRound, number> = {
-  R32: 1, R16: 2, QF: 4, SF: 8, F: 16, '3RD': 16,
-}
-
-// Tamaño visual de card por ronda — crece hacia la final
+// ─── Escala por ronda en layout vertical ──────────────────────────────────────
 const ROUND_SCALE: Record<BracketRound, 'sm' | 'md' | 'lg' | 'xl'> = {
-  R32: 'sm', R16: 'md', QF: 'md', SF: 'lg', F: 'xl', '3RD': 'md',
+  R32: 'sm', R16: 'sm', QF: 'md', SF: 'lg', F: 'xl', '3RD': 'md',
 }
 
-// ─── Partición del árbol en mitad izquierda / derecha ─────────────────────────
-// El bracket real del Mundial tiene dos mitades: una que confluye en SF-1 y
-// otra que confluye en SF-2. Esto solo lee `nextMatchId` (ya generado por
-// lib/bracket.ts) para clasificar cada partido — no recalcula ni reordena
-// ninguna lógica del cuadro.
-function splitBracketHalves(bracket: BracketMatch[]) {
-  const sf = bracket.filter(m => m.round === 'SF')
-  const sf1 = sf.find(m => m.id === 'SF-1')
-  const sf2 = sf.find(m => m.id === 'SF-2')
-
-  const idToMatch = new Map(bracket.map(m => [m.id, m]))
-
-  // Para cada partido, sigue la cadena de nextMatchId hasta llegar a SF-1 o SF-2
-  function belongsToSF1(m: BracketMatch): boolean {
-    let cur: BracketMatch | undefined = m
-    const seen = new Set<string>()
-    while (cur && cur.round !== 'SF' && cur.nextMatchId && !seen.has(cur.id)) {
-      seen.add(cur.id)
-      cur = idToMatch.get(cur.nextMatchId)
-    }
-    if (cur?.id === 'SF-1') return true
-    if (cur?.id === 'SF-2') return false
-    return true // fallback defensivo, no debería ocurrir con el cuadro oficial
-  }
-
-  const left = { R32: [] as BracketMatch[], R16: [] as BracketMatch[], QF: [] as BracketMatch[], SF: sf1 ? [sf1] : [] }
-  const right = { R32: [] as BracketMatch[], R16: [] as BracketMatch[], QF: [] as BracketMatch[], SF: sf2 ? [sf2] : [] }
-
-  for (const round of ['R32', 'R16', 'QF'] as const) {
-    for (const m of bracket.filter(x => x.round === round)) {
-      if (belongsToSF1(m)) left[round].push(m)
-      else right[round].push(m)
-    }
-  }
-
-  return { left, right }
+// ─── Columnas por ronda (cuántas cards se muestran en fila) ───────────────────
+const ROUND_COLS: Record<BracketRound, number> = {
+  R32: 2, R16: 2, QF: 2, SF: 2, F: 1, '3RD': 1,
 }
-function RoundColumn({
+
+// ─── Sección de una ronda en layout vertical ──────────────────────────────────
+function RoundSection({
   round,
   matches,
-  side,
-  treeHeight,
+  sectionRef,
 }: {
   round: BracketRound
   matches: BracketMatch[]
-  side: 'left' | 'right'
-  treeHeight: number
+  sectionRef?: React.RefObject<HTMLDivElement | null>
 }) {
-  const span = ROUND_SPAN[round]
   const allFuture = matches.every(m => !m.home.team && !m.away.team)
+  const cols = ROUND_COLS[round]
+  const scale = ROUND_SCALE[round]
 
   return (
     <div
-      className={`br-round-col${allFuture ? ' br-round-future' : ''}`}
+      ref={sectionRef}
+      className={`brv-section${allFuture ? ' brv-section-future' : ''}`}
       data-round={round}
-      style={{ height: treeHeight }}
     >
-      <div className="br-round-header">
-        <div className="br-round-name">{ROUND_LABELS[round]}</div>
-        <div className="br-round-date">{ROUND_DATES[round]}</div>
+      <div className="brv-section-header">
+        <div className="brv-section-name">{ROUND_LABELS[round]}</div>
+        <div className="brv-section-date">{ROUND_DATES[round]}</div>
       </div>
-      <div className="br-round-matches" style={{ height: treeHeight }}>
-        {matches.map((m, i) => {
-          const slotHeight = span * UNIT
-          const center = slotHeight * i + slotHeight / 2
-          const isSF = round === 'SF'
-          // Fase 5: conector iluminado en verde cuando el partido está resuelto
-          const isDone = m.status === 'done'
-
-          return (
-            <div
-              key={m.id}
-              className="br-match-wrapper"
-              style={{ top: center, transform: 'translateY(-50%)' }}
-            >
-              <MatchCard match={m} scale={ROUND_SCALE[round]} highlight={round === 'F'} />
-
-              {m.nextMatchId && !isSF && (
-                <svg
-                  className={`br-connector br-connector-${side} br-connector-${m.nextPosition}${isDone ? ' br-connector-done' : ''}`}
-                  width={28}
-                  height={slotHeight}
-                  viewBox={`0 0 28 ${slotHeight}`}
-                  preserveAspectRatio="none"
-                >
-                  <path
-                    d={
-                      side === 'left'
-                        ? `M0,${slotHeight / 2} H14 V${m.nextPosition === 'home' ? slotHeight : 0} H28`
-                        : `M28,${slotHeight / 2} H14 V${m.nextPosition === 'home' ? slotHeight : 0} H0`
-                    }
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                    strokeLinecap="round"
-                  />
-                </svg>
-              )}
-
-              {isSF && (
-                <div className={`br-sf-connector br-sf-connector-${side}${isDone ? ' br-connector-done' : ''}`} />
-              )}
-            </div>
-          )
-        })}
+      <div className={`brv-grid brv-grid-${cols}`}>
+        {matches.map(m => (
+          <MatchCard key={m.id} match={m} scale={scale} highlight={round === 'F'} />
+        ))}
       </div>
     </div>
   )
 }
 
-// ─── Vista de tercer puesto y final ───────────────────────────────────────────
-function FinalSection({ bracket, treeHeight }: { bracket: BracketMatch[]; treeHeight: number }) {
+// ─── Sección especial: Final + Tercer Puesto ──────────────────────────────────
+function FinalSections({
+  bracket,
+  finalRef,
+}: {
+  bracket: BracketMatch[]
+  finalRef?: React.RefObject<HTMLDivElement | null>
+}) {
   const final = bracket.find(m => m.round === 'F')
   const third = bracket.find(m => m.round === '3RD')
 
   return (
-    <div className="br-final-col" style={{ height: treeHeight }}>
-      <div className="br-round-header">
-        <div className="br-round-name">Final</div>
-        <div className="br-round-date">{ROUND_DATES['F']}</div>
-      </div>
-      <div
-        className="br-final-section"
-        style={{ top: treeHeight / 2, transform: 'translateY(-50%)' }}
-      >
+    <>
+      {/* GRAN FINAL */}
+      <div ref={finalRef} className="brv-section brv-section-final" data-round="F">
+        <div className="brv-section-header">
+          <div className="brv-final-crown">🏆</div>
+          <div className="brv-section-name brv-section-name-final">Gran Final</div>
+          <div className="brv-section-date">{ROUND_DATES['F']}</div>
+        </div>
         {final && (
-          <div className="br-final-wrap">
-            <div className="br-final-label">⭐ GRAN FINAL</div>
+          <div className="brv-final-card-wrap">
             <MatchCard match={final} scale="xl" highlight />
           </div>
         )}
+      </div>
+
+      {/* TERCER PUESTO */}
+      <div className="brv-section brv-section-third" data-round="3RD">
+        <div className="brv-section-header">
+          <div className="brv-third-crown">🥉</div>
+          <div className="brv-section-name">Tercer Puesto</div>
+          <div className="brv-section-date">{ROUND_DATES['3RD']}</div>
+        </div>
         {third && (
-          <div className="br-third-wrap">
-            <div className="br-third-label">🥉 TERCER PUESTO</div>
-            <div className="br-final-date">{ROUND_DATES['3RD']}</div>
+          <div className="brv-third-card-wrap">
             <MatchCard match={third} scale="md" />
           </div>
         )}
       </div>
-    </div>
+    </>
   )
 }
 
-// ─── Bracket desktop ──────────────────────────────────────────────────────────
-function BracketDesktop({ bracket }: { bracket: BracketMatch[] }) {
-  const roundsLeftToRight: Array<'R32' | 'R16' | 'QF' | 'SF'> = ['R32', 'R16', 'QF', 'SF']
-  const treeHeight = ROUND_SPAN.SF * UNIT
-  const { left, right } = splitBracketHalves(bracket)
-  const scrollRef = useRef<HTMLDivElement>(null)
+// ─── Layout vertical principal ────────────────────────────────────────────────
+function BracketVertical({ bracket }: { bracket: BracketMatch[] }) {
+  const sectionRefs = useRef<Map<BracketRound, HTMLDivElement>>(new Map())
 
-  // Fase 6: al cargar, centra en la ronda activa más avanzada.
-  // "Activa" = primera ronda que aún tiene partidos pending o live.
-  // Si todo está resuelto, centra en la Final.
+  // Auto-scroll a la ronda activa más avanzada
   useEffect(() => {
-    const container = scrollRef.current
-    if (!container) return
     const roundOrder: BracketRound[] = ['R32', 'R16', 'QF', 'SF', 'F']
     const activeRound = roundOrder.find(r =>
       bracket.some(m => m.round === r && (m.status === 'pending' || m.status === 'live'))
     ) ?? 'F'
-    const targetCol = container.querySelector<HTMLElement>(
-      `.br-round-col[data-round="${activeRound}"]`
-    )
-    if (!targetCol) return
-    const colLeft = targetCol.offsetLeft
-    const colWidth = targetCol.offsetWidth
-    container.scrollLeft = colLeft - (container.clientWidth - colWidth) / 2
+    const el = sectionRefs.current.get(activeRound)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
   }, [bracket])
 
+  const mainRounds: BracketRound[] = ['R32', 'R16', 'QF', 'SF']
+
   return (
-    <div className="br-desktop">
-      <div className="br-scroll-container" ref={scrollRef}>
-        <div className="br-tree" style={{ height: treeHeight }}>
-          {roundsLeftToRight.map((round) => (
-            <RoundColumn
-              key={round}
-              round={round}
-              matches={left[round]}
-              side="left"
-              treeHeight={treeHeight}
-            />
-          ))}
-          <FinalSection bracket={bracket} treeHeight={treeHeight} />
-          {[...roundsLeftToRight].reverse().map((round) => (
-            <RoundColumn
-              key={`${round}-right`}
-              round={round}
-              matches={right[round]}
-              side="right"
-              treeHeight={treeHeight}
-            />
-          ))}
-        </div>
-      </div>
-      <div className="br-scroll-hint">← Deslizá para ver el bracket completo →</div>
+    <div className="brv-root">
+      {mainRounds.map(round => {
+        const matches = bracket.filter(m => m.round === round)
+        return (
+          <RoundSection
+            key={round}
+            round={round}
+            matches={matches}
+            sectionRef={{
+              current: null,
+              ...{} // inline workaround; usamos callback ref abajo
+            } as React.RefObject<HTMLDivElement | null>}
+          />
+        )
+      })}
+      <FinalSections bracket={bracket} />
     </div>
   )
 }
 
+// Versión con callback refs para el auto-scroll
+function BracketVerticalWithRefs({ bracket }: { bracket: BracketMatch[] }) {
+  const refsMap = useRef<Map<BracketRound, HTMLDivElement | null>>(new Map())
 
-// ─── Bracket mobile (tabs por ronda) ─────────────────────────────────────────
-function BracketMobile({ bracket }: { bracket: BracketMatch[] }) {
-  const allRounds: BracketRound[] = ['R32', 'R16', 'QF', 'SF', 'F', '3RD']
-  const [activeRound, setActiveRound] = useState<BracketRound>('R32')
+  useEffect(() => {
+    const roundOrder: BracketRound[] = ['R32', 'R16', 'QF', 'SF', 'F']
+    const activeRound = roundOrder.find(r =>
+      bracket.some(m => m.round === r && (m.status === 'pending' || m.status === 'live'))
+    ) ?? 'F'
+    const el = refsMap.current.get(activeRound)
+    if (el) {
+      setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+    }
+  }, [bracket])
 
-  const matches = bracket.filter(m => m.round === activeRound)
+  const mainRounds: BracketRound[] = ['R32', 'R16', 'QF', 'SF']
 
   return (
-    <div className="br-mobile">
-      {/* Tabs de ronda */}
-      <div className="br-mobile-tabs">
-        {allRounds.map(r => (
-          <button
-            key={r}
-            className={`br-tab-btn${activeRound === r ? ' active' : ''}`}
-            onClick={() => setActiveRound(r)}
+    <div className="brv-root">
+      {mainRounds.map(round => {
+        const matches = bracket.filter(m => m.round === round)
+        const allFuture = matches.every(m => !m.home.team && !m.away.team)
+        const cols = ROUND_COLS[round]
+        const scale = ROUND_SCALE[round]
+        return (
+          <div
+            key={round}
+            ref={el => { refsMap.current.set(round, el) }}
+            className={`brv-section${allFuture ? ' brv-section-future' : ''}`}
+            data-round={round}
           >
-            {ROUND_LABELS[r]}
-          </button>
-        ))}
-      </div>
+            <div className="brv-section-header">
+              <div className="brv-section-name">{ROUND_LABELS[round]}</div>
+              <div className="brv-section-date">{ROUND_DATES[round]}</div>
+            </div>
+            <div className={`brv-grid brv-grid-${cols}`}>
+              {matches.map(m => (
+                <MatchCard key={m.id} match={m} scale={scale} highlight={false} />
+              ))}
+            </div>
+          </div>
+        )
+      })}
 
-      <div className="br-mobile-date">{ROUND_DATES[activeRound]}</div>
-
-      <div className="br-mobile-matches">
-        {matches.map(m => (
-          <MatchCard key={m.id} match={m} highlight={m.round === 'F'} />
-        ))}
-      </div>
+      {/* Gran Final */}
+      {(() => {
+        const final = bracket.find(m => m.round === 'F')
+        const third = bracket.find(m => m.round === '3RD')
+        return (
+          <>
+            <div
+              ref={el => { refsMap.current.set('F', el) }}
+              className="brv-section brv-section-final"
+              data-round="F"
+            >
+              <div className="brv-section-header">
+                <div className="brv-final-crown">🏆</div>
+                <div className="brv-section-name brv-section-name-final">Gran Final</div>
+                <div className="brv-section-date">{ROUND_DATES['F']}</div>
+              </div>
+              {final && (
+                <div className="brv-final-card-wrap">
+                  <MatchCard match={final} scale="xl" highlight />
+                </div>
+              )}
+            </div>
+            <div className="brv-section brv-section-third" data-round="3RD">
+              <div className="brv-section-header">
+                <div className="brv-third-crown">🥉</div>
+                <div className="brv-section-name">Tercer Puesto</div>
+                <div className="brv-section-date">{ROUND_DATES['3RD']}</div>
+              </div>
+              {third && (
+                <div className="brv-third-card-wrap">
+                  <MatchCard match={third} scale="md" />
+                </div>
+              )}
+            </div>
+          </>
+        )
+      })()}
     </div>
   )
 }
@@ -423,12 +377,7 @@ export function BracketView() {
         </div>
         <button className="refresh-btn" onClick={fetchAndRebuild}>↻ Actualizar</button>
       </div>
-
-      {/* Desktop */}
-      <BracketDesktop bracket={bracket} />
-
-      {/* Mobile */}
-      <BracketMobile bracket={bracket} />
+      <BracketVerticalWithRefs bracket={bracket} />
     </div>
   )
 }

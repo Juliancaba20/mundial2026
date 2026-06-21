@@ -1,11 +1,14 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import type { Match, LiveResultsMap } from '@/types'
+import type { Match, BracketMatch, BracketRound, LiveResultsMap, KnockoutResultsMap } from '@/types'
 import { BASE_MATCHES } from '@/lib/data'
+import { buildBracket, ROUND_LABELS, ROUND_DATES } from '@/lib/bracket'
 import { MatchRow } from './MatchRow'
+import { BracketMatchRow } from './BracketMatchRow'
 import { TeamFlag } from './TeamFlag'
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 type SortMode = 'date' | 'group'
 
@@ -29,12 +32,26 @@ function getLocalDateLabel(kickoff: string): string {
   })
 }
 
+// Clasifica un partido de fase de grupos en Fecha 1/2/3 según el kickoff UTC
+function getMatchday(kickoff: string): 'Fecha 1' | 'Fecha 2' | 'Fecha 3' {
+  const d = kickoff.slice(0, 10) // 'YYYY-MM-DD'
+  if (d < '2026-06-18') return 'Fecha 1'
+  if (d < '2026-06-24') return 'Fecha 2'
+  return 'Fecha 3'
+}
+
+// Rondas de eliminatorias en orden cronológico para el calendario
+const KO_ROUNDS: BracketRound[] = ['R32', 'R16', 'QF', 'SF', '3RD', 'F']
+
+// ─── Componente principal MatchesClient ───────────────────────────────────────
+
 interface Props {
   groupFilter?: string
 }
 
 export function MatchesClient({ groupFilter }: Props) {
   const [matches, setMatches] = useState<Match[]>(BASE_MATCHES)
+  const [bracket, setBracket] = useState<BracketMatch[]>(() => buildBracket(BASE_MATCHES))
   const [sortMode, setSortMode] = useState<SortMode>('date')
   const [selectedGroup, setSelectedGroup] = useState(groupFilter ?? '')
   const [statusText, setStatusText] = useState('Cargando resultados…')
@@ -46,9 +63,10 @@ export function MatchesClient({ groupFilter }: Props) {
     try {
       const res = await fetch('/api/resultados', { cache: 'no-store' })
       if (!res.ok) throw new Error('API error')
-      const data: { results: LiveResultsMap } = await res.json()
+      const data: { results: LiveResultsMap; knockoutResults: KnockoutResultsMap } = await res.json()
       const updated = applyResults(BASE_MATCHES, data.results ?? {})
       setMatches(updated)
+      setBracket(buildBracket(updated, data.knockoutResults ?? {}))
       const liveCount = updated.filter(m => m.status === 'live').length
       const doneCount = updated.filter(m => m.status === 'done').length
       setHasLive(liveCount > 0)
@@ -74,62 +92,178 @@ export function MatchesClient({ groupFilter }: Props) {
     return () => clearInterval(id)
   }, [fetchResults])
 
-  const list = matches.filter(m => !selectedGroup || m.group === selectedGroup)
   const groupLetters = 'ABCDEFGHIJKL'.split('')
 
   function dateLabel(m: Match): string {
     return localDateMap[m.id] || m.date
   }
 
-  function renderList() {
-    if (!list.length) return <div style={{ textAlign:'center', padding:'48px', color:'var(--faint)', fontSize:14 }}>No hay partidos para este grupo.</div>
+  // ── Renderizado de fase de grupos ─────────────────────────────────────────
 
-    if (sortMode === 'date') {
-      const sorted = [...list].sort((a, b) => {
-        if (a.dateSort !== b.dateSort) return a.dateSort - b.dateSort
-        return new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
-      })
+  function renderGroupPhase() {
+    const groupMatches = matches.filter(m => !selectedGroup || m.group === selectedGroup)
 
-      const days: string[] = []
-      const seen = new Set<string>()
-      for (const m of sorted) {
-        const label = dateLabel(m)
-        if (!seen.has(label)) { seen.add(label); days.push(label) }
-      }
-
-      return days.map(day => {
-        const dayMatches = sorted.filter(m => dateLabel(m) === day)
-        return (
-          <div key={day}>
-            <div className="day-label">
-              {day} <span className="day-count">{dayMatches.length} partido{dayMatches.length !== 1 ? 's' : ''}</span>
-            </div>
-            {dayMatches.map(m => <MatchRow key={m.id} match={m} showGroup={!selectedGroup} />)}
-          </div>
-        )
-      })
-    }
-
-    return groupLetters.map(g => {
-      const gMatches = list.filter(m => m.group === g)
-      if (!gMatches.length) return null
+    if (!groupMatches.length) {
       return (
-        <div key={g}>
-          <div className="day-label">
-            Grupo {g} <span className="day-count">{gMatches.length} partidos</span>
-          </div>
-          {gMatches.map(m => <MatchRow key={m.id} match={m} showGroup={false} />)}
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--faint)', fontSize: 14 }}>
+          No hay partidos para este grupo.
         </div>
       )
+    }
+
+    if (sortMode === 'group') {
+      return (
+        <>
+          {groupLetters.map(g => {
+            const gMatches = groupMatches.filter(m => m.group === g)
+            if (!gMatches.length) return null
+            return (
+              <div key={g}>
+                <div className="day-label">
+                  Grupo {g} <span className="day-count">{gMatches.length} partidos</span>
+                </div>
+                {gMatches.map(m => <MatchRow key={m.id} match={m} showGroup={false} />)}
+              </div>
+            )
+          })}
+        </>
+      )
+    }
+
+    // sortMode === 'date' — agrupar por fecha local del kickoff
+    const sorted = [...groupMatches].sort((a, b) => {
+      if (a.dateSort !== b.dateSort) return a.dateSort - b.dateSort
+      return new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
     })
+
+    const days: string[] = []
+    const seen = new Set<string>()
+    for (const m of sorted) {
+      const label = dateLabel(m)
+      if (!seen.has(label)) { seen.add(label); days.push(label) }
+    }
+
+    return (
+      <>
+        {days.map(day => {
+          const dayMatches = sorted.filter(m => dateLabel(m) === day)
+          return (
+            <div key={day}>
+              <div className="day-label">
+                {day} <span className="day-count">{dayMatches.length} partido{dayMatches.length !== 1 ? 's' : ''}</span>
+              </div>
+              {dayMatches.map(m => <MatchRow key={m.id} match={m} showGroup={!selectedGroup} />)}
+            </div>
+          )
+        })}
+      </>
+    )
   }
+
+  // ── Renderizado de fase de grupos agrupado por jornada ────────────────────
+  // (usado cuando no hay filtro de grupo activo y el modo es 'date')
+
+  function renderGroupPhaseByMatchday() {
+    const MATCHDAY_LABELS = { 'Fecha 1': 'Fecha 1', 'Fecha 2': 'Fecha 2', 'Fecha 3': 'Fecha 3' } as const
+    const matchdays = ['Fecha 1', 'Fecha 2', 'Fecha 3'] as const
+
+    return (
+      <>
+        {matchdays.map(md => {
+          const mdMatches = matches
+            .filter(m => getMatchday(m.kickoff) === md)
+            .sort((a, b) => {
+              if (a.dateSort !== b.dateSort) return a.dateSort - b.dateSort
+              return new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
+            })
+          if (!mdMatches.length) return null
+
+          // Dentro de cada jornada, agrupa por día local
+          const days: string[] = []
+          const seen = new Set<string>()
+          for (const m of mdMatches) {
+            const label = dateLabel(m)
+            if (!seen.has(label)) { seen.add(label); days.push(label) }
+          }
+
+          return (
+            <div key={md} className="cal-phase-block">
+              <div className="cal-phase-header">
+                <span className="cal-phase-name">{MATCHDAY_LABELS[md]}</span>
+                <span className="cal-phase-sub">Fase de grupos</span>
+              </div>
+              {days.map(day => {
+                const dayMatches = mdMatches.filter(m => dateLabel(m) === day)
+                return (
+                  <div key={day}>
+                    <div className="day-label">
+                      {day} <span className="day-count">{dayMatches.length} partido{dayMatches.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    {dayMatches.map(m => <MatchRow key={m.id} match={m} showGroup={true} />)}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
+      </>
+    )
+  }
+
+  // ── Renderizado de eliminatorias ──────────────────────────────────────────
+
+  function renderKnockoutPhase() {
+    // Si hay filtro de grupo activo, no mostrar eliminatorias
+    if (selectedGroup) return null
+
+    return (
+      <>
+        {KO_ROUNDS.map(round => {
+          const roundMatches = bracket.filter(m => m.round === round)
+          if (!roundMatches.length) return null
+          const label = ROUND_LABELS[round]
+          const dates = ROUND_DATES[round]
+          const isFinalRound = round === 'F'
+          const isThirdRound = round === '3RD'
+
+          return (
+            <div key={round} className="cal-phase-block">
+              <div className={`cal-phase-header${isFinalRound ? ' cal-phase-header--final' : ''}${isThirdRound ? ' cal-phase-header--third' : ''}`}>
+                <span className="cal-phase-name">{label}</span>
+                <span className="cal-phase-sub">{dates}</span>
+              </div>
+              <div>
+                {roundMatches
+                  .slice()
+                  .sort((a, b) => {
+                    if (!a.kickoff || !b.kickoff) return 0
+                    return new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
+                  })
+                  .map(m => (
+                    <BracketMatchRow key={m.id} match={m} />
+                  ))}
+              </div>
+            </div>
+          )
+        })}
+      </>
+    )
+  }
+
+  // ── Vista principal ───────────────────────────────────────────────────────
+
+  const showFullCalendar = !selectedGroup && sortMode === 'date'
 
   return (
     <>
       <div className="matches-header">
         <div>
           <div className="page-title">PARTIDOS</div>
-          <div className="page-sub">Fase de grupos · resultados en vivo vía ESPN</div>
+          <div className="page-sub">
+            {showFullCalendar
+              ? 'Calendario completo · fase de grupos y eliminatorias · resultados en vivo vía ESPN'
+              : 'Fase de grupos · resultados en vivo vía ESPN'}
+          </div>
         </div>
         <div className="toolbar">
           {!groupFilter && (
@@ -156,11 +290,20 @@ export function MatchesClient({ groupFilter }: Props) {
       {apiError && (
         <div className="api-error">
           ⚠ No se pudieron cargar resultados en vivo.{' '}
-          <button onClick={fetchResults} style={{ color:'#74b9ff', background:'none', border:'none', cursor:'pointer' }}>Reintentar</button>
+          <button onClick={fetchResults} style={{ color: '#74b9ff', background: 'none', border: 'none', cursor: 'pointer' }}>Reintentar</button>
         </div>
       )}
 
-      <div>{renderList()}</div>
+      <div>
+        {showFullCalendar ? (
+          <>
+            {renderGroupPhaseByMatchday()}
+            {renderKnockoutPhase()}
+          </>
+        ) : (
+          renderGroupPhase()
+        )}
+      </div>
     </>
   )
 }
@@ -169,23 +312,27 @@ export function MatchesClient({ groupFilter }: Props) {
 export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Match[] }) {
   const [matches, setMatches] = useState<Match[]>(initialMatches)
 
-  useEffect(() => {
-    fetch('/api/resultados', { cache: 'no-store' })
-      .then(r => r.json())
-      .then((data: { results: LiveResultsMap }) => {
-        setMatches(applyResults(initialMatches, data.results ?? {}))
-      })
-      .catch(() => {})
+  const fetchAndUpdate = useCallback(async () => {
+    try {
+      const res = await fetch('/api/resultados', { cache: 'no-store' })
+      if (!res.ok) return
+      const data: { results: LiveResultsMap } = await res.json()
+      setMatches(applyResults(initialMatches, data.results ?? {}))
+    } catch { /* mantiene datos actuales */ }
   }, [initialMatches])
+
+  useEffect(() => {
+    fetchAndUpdate()
+    const id = setInterval(fetchAndUpdate, 60_000)
+    return () => clearInterval(id)
+  }, [fetchAndUpdate])
 
   const live = matches.filter(m => m.status === 'live')
   const done = matches.filter(m => m.status === 'done')
   const upcoming = matches.filter(m => m.status === 'pending')
 
-  // Partido héroe: prioridad live > próximo inmediato > último finalizado
   const hero = live[0] ?? upcoming[0] ?? done[done.length - 1] ?? null
 
-  // Cards secundarias: excluye el héroe, max 5
   const secondary = matches
     .filter(m => m.id !== hero?.id)
     .filter(m => {
@@ -247,7 +394,7 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
         <div className="featured-matches">
           {secondary.map(m => {
             const badge = m.status === 'live'
-              ? <div className="fm-badge-live"><span className="live-dot" style={{width:5,height:5}} />EN VIVO {m.clock}</div>
+              ? <div className="fm-badge-live"><span className="live-dot" style={{ width: 5, height: 5 }} />EN VIVO {m.clock}</div>
               : m.status === 'done'
                 ? <div className="fm-badge-done">Final</div>
                 : <div className="fm-badge-next">Próximo · {m.date}</div>
@@ -257,7 +404,7 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
               : <div className={`fm-score-center${m.status === 'live' ? ' live' : ''}`}>{m.score}</div>
 
             return (
-              <a key={m.id} href="/partidos" className={`fm-card${m.status === 'live' ? ' is-live' : ''}${m.status === 'done' ? ' is-done-card' : ''}`} style={{textDecoration:'none'}}>
+              <a key={m.id} href="/partidos" className={`fm-card${m.status === 'live' ? ' is-live' : ''}${m.status === 'done' ? ' is-done-card' : ''}`} style={{ textDecoration: 'none' }}>
                 <div className="fm-top">
                   <span className="fm-group">Grupo {m.group}</span>
                   {badge}
@@ -287,12 +434,20 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
 export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }) {
   const [matches, setMatches] = useState<Match[]>(initialMatches)
 
-  useEffect(() => {
-    fetch('/api/resultados', { cache: 'no-store' })
-      .then(r => r.json())
-      .then((data: { results: LiveResultsMap }) => setMatches(applyResults(initialMatches, data.results ?? {})))
-      .catch(() => {})
+  const fetchAndUpdateStrip = useCallback(async () => {
+    try {
+      const res = await fetch('/api/resultados', { cache: 'no-store' })
+      if (!res.ok) return
+      const data: { results: LiveResultsMap } = await res.json()
+      setMatches(applyResults(initialMatches, data.results ?? {}))
+    } catch { /* mantiene datos actuales */ }
   }, [initialMatches])
+
+  useEffect(() => {
+    fetchAndUpdateStrip()
+    const id = setInterval(fetchAndUpdateStrip, 60_000)
+    return () => clearInterval(id)
+  }, [fetchAndUpdateStrip])
 
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
   const live = matches.filter(m => m.status === 'live')
@@ -315,7 +470,7 @@ export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }
         <div className={`hm-label${isLiveLabel ? ' live' : ''}`}>{labelText}</div>
         <div style={{ display: 'flex', gap: 0, alignItems: 'center' }}>
           {toShow.map(m => (
-            <a key={m.id} href="/partidos" className={`hm-card${m.status === 'live' ? ' active-live' : ''}`} style={{textDecoration:'none'}}>
+            <a key={m.id} href="/partidos" className={`hm-card${m.status === 'live' ? ' active-live' : ''}`} style={{ textDecoration: 'none' }}>
               <div className="hm-team">
                 <TeamFlag code={m.home.flagCode} name={m.home.name} size={18} className="hm-flag-img" />
                 <span className="hm-name">{m.home.name}</span>

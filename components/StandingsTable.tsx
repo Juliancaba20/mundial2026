@@ -6,9 +6,35 @@ import { TeamFlag } from './TeamFlag'
 interface Props {
   standings: TeamStanding[]
   compact?: boolean  // true → versión reducida para la grilla de /grupos
+  // slugs de terceros que YA clasificaron (verde); si se pasa el set completo de terceros
+  // y el equipo no está en él → rojo. Si es undefined → color estático por posición.
+  qualifiedThirdSlugs?: Set<string>
+  // true cuando todos los grupos han terminado y ya se conocen los 8 mejores terceros
+  thirdsResolved?: boolean
 }
 
-export function StandingsTable({ standings, compact = false }: Props) {
+// Devuelve la clase CSS de color para cada fila según su posición y estado
+function getRowClass(
+  i: number,
+  slug: string,
+  anyPlayed: boolean,
+  qualifiedThirdSlugs?: Set<string>,
+  thirdsResolved?: boolean,
+): string {
+  if (!anyPlayed) return 'st-row'
+
+  if (i === 0 || i === 1) return 'st-row st-pos-top'       // verde
+  if (i === 3) return 'st-row st-pos-fourth'               // rojo siempre
+
+  // Posición 3 (i === 2)
+  if (thirdsResolved && qualifiedThirdSlugs !== undefined) {
+    if (qualifiedThirdSlugs.has(slug)) return 'st-row st-pos-third-in'   // verde
+    return 'st-row st-pos-third-out'                                       // rojo
+  }
+  return 'st-row st-pos-third'                             // amarillo (pendiente)
+}
+
+export function StandingsTable({ standings, compact = false, qualifiedThirdSlugs, thirdsResolved }: Props) {
   if (standings.length === 0) return null
 
   const anyPlayed = standings.some(s => s.pj > 0)
@@ -34,13 +60,10 @@ export function StandingsTable({ standings, compact = false }: Props) {
           {standings.map((row, i) => (
             <tr
               key={row.team.slug}
-              className={`st-row${row.qualified && anyPlayed ? ' st-qualified' : ''}`}
+              className={getRowClass(i, row.team.slug, anyPlayed, qualifiedThirdSlugs, thirdsResolved)}
             >
               <td className="st-pos">
-                {row.qualified && anyPlayed
-                  ? <span className="st-q-dot" title="Clasifica" />
-                  : <span className="st-pos-num">{i + 1}</span>
-                }
+                <span className="st-pos-num">{i + 1}</span>
               </td>
               <td className="st-team">
                 <Link href={`/equipo/${row.team.slug}`} className="st-team-link">
@@ -63,7 +86,9 @@ export function StandingsTable({ standings, compact = false }: Props) {
 
       {anyPlayed && (
         <div className="st-legend">
-          <span className="st-q-dot" /> Clasifica a 16avos de final
+          <span className="st-legend-dot st-legend-green" /> Clasifica
+          <span className="st-legend-dot st-legend-yellow" style={{ marginLeft: 10 }} /> 3° (pendiente)
+          <span className="st-legend-dot st-legend-red" style={{ marginLeft: 10 }} /> Eliminado
         </div>
       )}
     </div>

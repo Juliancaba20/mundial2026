@@ -4,8 +4,10 @@ import { useEffect, useState, useCallback } from 'react'
 import type { Match, LiveResultsMap } from '@/types'
 import type { TeamStanding } from '@/lib/standings'
 import { calculateStandings } from '@/lib/standings'
+import { getBestThirds } from '@/lib/bracket'
 import { StandingsTable } from './StandingsTable'
 import { MatchRow } from './MatchRow'
+import { BASE_MATCHES } from '@/lib/data'
 
 function applyResults(matches: Match[], results: LiveResultsMap): Match[] {
   return matches.map(m => {
@@ -16,6 +18,19 @@ function applyResults(matches: Match[], results: LiveResultsMap): Match[] {
   })
 }
 
+// Calcula qué slugs de terceros clasifican, usando todos los partidos
+function computeQualifiedThirds(allMatches: Match[]): { slugs: Set<string>; resolved: boolean } {
+  const thirds = getBestThirds(allMatches)
+  // "resolved" = los 12 grupos tienen al menos 3 partidos jugados cada uno
+  const groupsComplete = 'ABCDEFGHIJKL'.split('').every(letter => {
+    const s = calculateStandings(letter, allMatches)
+    return s.length === 4 && s.every(row => row.pj === 3)
+  })
+  const top8 = thirds.slice(0, 8)
+  const slugs = new Set(top8.map(t => t.team?.slug).filter(Boolean) as string[])
+  return { slugs, resolved: groupsComplete }
+}
+
 interface Props {
   groupLetter: string
   initialMatches: Match[]
@@ -23,9 +38,12 @@ interface Props {
 
 export function LiveGroupStandings({ groupLetter, initialMatches }: Props) {
   const [matches, setMatches] = useState<Match[]>(initialMatches)
+  const [allMatches, setAllMatches] = useState<Match[]>(BASE_MATCHES)
   const [standings, setStandings] = useState<TeamStanding[]>(
     () => calculateStandings(groupLetter, initialMatches)
   )
+  const [qualifiedThirdSlugs, setQualifiedThirdSlugs] = useState<Set<string>>(new Set())
+  const [thirdsResolved, setThirdsResolved] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [hasLive, setHasLive] = useState(false)
 
@@ -35,10 +53,15 @@ export function LiveGroupStandings({ groupLetter, initialMatches }: Props) {
       if (!res.ok) return
       const data: { results: LiveResultsMap } = await res.json()
       const updated = applyResults(initialMatches, data.results ?? {})
+      const updatedAll = applyResults(BASE_MATCHES, data.results ?? {})
       setMatches(updated)
+      setAllMatches(updatedAll)
       setStandings(calculateStandings(groupLetter, updated))
       setHasLive(updated.some(m => m.status === 'live'))
       setLastUpdated(new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }))
+      const { slugs, resolved } = computeQualifiedThirds(updatedAll)
+      setQualifiedThirdSlugs(slugs)
+      setThirdsResolved(resolved)
     } catch { /* mantiene los datos base */ }
   }, [groupLetter, initialMatches])
 
@@ -75,7 +98,12 @@ export function LiveGroupStandings({ groupLetter, initialMatches }: Props) {
             </button>
           </div>
         </div>
-        <StandingsTable standings={standings} compact={false} />
+        <StandingsTable
+          standings={standings}
+          compact={false}
+          qualifiedThirdSlugs={qualifiedThirdSlugs}
+          thirdsResolved={thirdsResolved}
+        />
       </div>
 
       {/* PARTIDOS */}
