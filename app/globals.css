@@ -30,6 +30,7 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  padding-top: 64px;
 }
 a { color: inherit; text-decoration: none; }
 button { font-family: var(--body); cursor: pointer; }
@@ -43,7 +44,7 @@ button { font-family: var(--body); cursor: pointer; }
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  padding: 0 24px; height: 56px; gap: 16px;
+  padding: 0 28px; height: 64px; gap: 16px;
 }
 .brand {
   display: flex; align-items: center; gap: 10px;
@@ -57,13 +58,13 @@ button { font-family: var(--body); cursor: pointer; }
 .brand-text { font-family: var(--display); letter-spacing: .06em; font-size: 18px; color: var(--text); line-height: 1; }
 .brand-year { font-size: 10px; color: var(--muted); letter-spacing: .08em; font-weight: 500; margin-top: 1px; }
 .nav-links {
-  display: flex; gap: 0; height: 56px; overflow-x: auto;
+  display: flex; gap: 0; height: 64px; overflow-x: auto;
   -ms-overflow-style: none; scrollbar-width: none;
   justify-content: center;
 }
 .nav-links::-webkit-scrollbar { display: none; }
 .nav-btn {
-  height: 56px; padding: 0 18px; border: none; background: transparent;
+  height: 64px; padding: 0 18px; border: none; background: transparent;
   color: var(--muted); font-size: 13px; font-weight: 500;
   cursor: pointer; white-space: nowrap; position: relative; transition: color .2s; letter-spacing: .01em;
 }
@@ -458,9 +459,10 @@ button { font-family: var(--body); cursor: pointer; }
 
 /* ── RESPONSIVE ────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-  .topbar { padding: 0 16px; height: 52px; grid-template-columns: auto 1fr auto; }
-  .nav-links { height: 52px; }
-  .nav-btn { padding: 0 14px; font-size: 12px; height: 52px; }
+  .topbar { padding: 0 16px; height: 56px; grid-template-columns: auto 1fr auto; }
+  .nav-links { height: 56px; }
+  .nav-btn { padding: 0 14px; font-size: 12px; height: 56px; }
+  body { padding-top: 56px; }
   .hero-content { padding: 60px 16px 44px; }
   .hero-title { font-size: clamp(48px,14vw,80px); }
   .hero-countdown { gap: 16px; }
@@ -734,104 +736,101 @@ button { font-family: var(--body); cursor: pointer; }
 .br-scale-xl .br-match-date { font-size: 10px; padding: 7px 14px 6px; }
 .br-scale-xl.br-match { border-radius: 12px; }
 
-/* ── Layout vertical (único, responsive) ──────────────────────────────── */
+/* ── Bracket árbol (desktop: izquierda→derecha) ───────────────────────── */
 
-.brv-root {
+.brt-desktop { display: block; }
+.brt-mobile  { display: none; }
+
+.brt-scroll-wrap {
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 16px;
+}
+
+.brt-tree {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   gap: 0;
-  max-width: 900px;
-  margin: 0 auto;
+  padding: 8px 4px 24px;
+  /* min-width ensures the tree never collapses */
+  min-width: max-content;
 }
 
-/* Sección de cada ronda */
-.brv-section {
-  padding: 28px 0 0;
-  border-top: 1px solid var(--border);
-}
-.brv-section:first-child { border-top: none; padding-top: 4px; }
-
-.brv-section-future .brv-section-name,
-.brv-section-future .brv-section-date { opacity: .45; }
-.brv-section-future .br-match { opacity: .45; pointer-events: none; }
-
-/* Header de cada ronda */
-.brv-section-header {
+/* ── Columna de ronda ────────────────────────────────────────────────── */
+.brt-col {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  margin-bottom: 16px;
+  flex-shrink: 0;
+  position: relative;
+}
+.brt-col-future .brt-round-name,
+.brt-col-future .brt-round-date { opacity: .4; }
+.brt-col-future .br-match { opacity: .4; pointer-events: none; }
+
+.brt-round-header {
   text-align: center;
+  padding: 0 4px 12px;
+  flex-shrink: 0;
+  height: 48px;
+  display: flex; flex-direction: column; justify-content: center;
 }
-.brv-section-name {
+.brt-round-name {
   font-family: var(--display); font-size: 13px;
-  letter-spacing: .08em; text-transform: uppercase;
-  color: var(--text);
+  letter-spacing: .07em; color: var(--text);
+  text-transform: uppercase;
 }
-.brv-section-date {
-  font-size: 10px; color: var(--faint); letter-spacing: .04em;
+.brt-round-date { font-size: 10px; color: var(--faint); margin-top: 2px; }
+
+/* Cards posicionadas absolutamente dentro de la columna */
+.brt-col-body { position: relative; }
+.brt-match-pos {
+  position: absolute;
+  left: 0; right: 0;
+}
+.brt-match-pos .br-match { width: 100%; min-width: unset; }
+
+/* ── Columna de conectores SVG ───────────────────────────────────────── */
+.brt-connector-col {
+  flex-shrink: 0;
+  position: relative;
+  /* desplazada 48px hacia abajo para alinear con el cuerpo de las cards */
+  margin-top: 48px;
 }
 
-/* Grilla de partidos: 2 columnas en rounds tempranos, 1 en final */
-.brv-grid {
-  display: grid;
-  gap: 8px;
+/* ── Final + 3RD ─────────────────────────────────────────────────────── */
+.brt-col-final .brt-round-name { color: var(--gold); }
+.brt-final-name { font-size: 15px !important; }
+.brt-third-label {
+  font-family: var(--display); font-size: 12px;
+  letter-spacing: .06em; color: var(--muted);
+  text-align: center; margin-bottom: 2px;
 }
-.brv-grid-1 { grid-template-columns: 1fr; }
-.brv-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.brt-third-date { font-size: 10px; color: var(--faint); text-align: center; margin-bottom: 6px; }
 
-/* En pantallas pequeñas, todo a 1 columna */
-@media (max-width: 560px) {
-  .brv-grid-2 { grid-template-columns: 1fr; }
+/* ── Mobile: tabs ────────────────────────────────────────────────────── */
+.brm-root { display: flex; flex-direction: column; gap: 0; }
+.brm-tabs {
+  display: flex; gap: 4px; overflow-x: auto;
+  padding-bottom: 4px; margin-bottom: 14px;
+  -ms-overflow-style: none; scrollbar-width: none;
 }
+.brm-tabs::-webkit-scrollbar { display: none; }
+.brm-tab {
+  flex-shrink: 0; padding: 6px 13px;
+  border: 1px solid var(--border2); border-radius: 20px;
+  background: transparent; color: var(--muted);
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  transition: all .15s; font-family: var(--body);
+}
+.brm-tab.active { background: var(--green); color: #fff; border-color: var(--green); }
+.brm-date { font-size: 11px; color: var(--faint); margin-bottom: 12px; letter-spacing: .04em; }
+.brm-matches { display: flex; flex-direction: column; gap: 8px; }
+.brm-matches .br-match { min-width: unset; width: 100%; }
 
-/* Cards en la grilla ocupan todo el ancho disponible */
-.brv-grid .br-match {
-  min-width: unset;
-  width: 100%;
-}
-
-/* ── Sección Gran Final ────────────────────────────────────────────────── */
-.brv-section-final {
-  padding-top: 36px;
-  border-top: 2px solid rgba(201,168,76,.35);
-  margin-top: 12px;
-}
-.brv-final-crown {
-  font-size: 28px; line-height: 1; margin-bottom: 4px;
-}
-.brv-section-name-final {
-  font-size: 18px; letter-spacing: .1em;
-  color: var(--gold);
-}
-.brv-final-card-wrap {
-  display: flex;
-  justify-content: center;
-}
-.brv-final-card-wrap .br-match {
-  min-width: unset;
-  width: 100%;
-  max-width: 480px;
-}
-
-/* ── Sección Tercer Puesto ─────────────────────────────────────────────── */
-.brv-section-third {
-  padding-top: 28px;
-  margin-top: 4px;
-  padding-bottom: 32px;
-}
-.brv-third-crown {
-  font-size: 22px; line-height: 1; margin-bottom: 4px;
-}
-.brv-third-card-wrap {
-  display: flex;
-  justify-content: center;
-}
-.brv-third-card-wrap .br-match {
-  min-width: unset;
-  width: 100%;
-  max-width: 400px;
+@media (max-width: 768px) {
+  .brt-desktop { display: none; }
+  .brt-mobile  { display: block; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
