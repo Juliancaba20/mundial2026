@@ -97,10 +97,10 @@ function MatchCard({ match, scale = 'sm', highlight = false }: {
 // ─── Configuración del árbol ──────────────────────────────────────────────────
 // UNIT: altura reservada por partido en la columna de R32 (la más densa)
 // Cada ronda siguiente ocupa 2× el espacio, centrado entre sus dos "padres"
-const UNIT = 96          // px por slot en R32
+const UNIT = 104         // px por slot en R32
 const CARD_H = 84        // altura aproximada de la card (2 slots + header + divider)
-const COL_W = 172        // ancho de cada columna de partidos
-const COL_GAP = 48       // gap entre columnas (espacio para conectores)
+const COL_W = 200        // ancho de cada columna de partidos
+const COL_GAP = 60       // gap entre columnas (espacio para conectores)
 
 const ROUND_ORDER: BracketRound[] = ['R32', 'R16', 'QF', 'SF', 'F']
 
