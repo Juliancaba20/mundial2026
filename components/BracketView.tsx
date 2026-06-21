@@ -149,13 +149,13 @@ function ConnectorLayer({ fromRoundIndex, fromMatches, toMatches }: {
       const p1Mid = p1Top + CARD_H / 2
       const isDone = fromMatches[parent1Idx].status === 'done'
       // línea horizontal desde borde derecho del padre → mitad del gap, luego curva → entrada del hijo
-      paths.push(`<path d="M 0 ${p1Mid} H ${W / 2} Q ${W * 0.75} ${p1Mid} ${W * 0.85} ${p1Mid + (toMid - p1Mid) * 0.5} T ${W} ${toMid}" fill="none" stroke="${isDone ? 'var(--green)' : 'var(--border2)'}" stroke-width="1.5" stroke-linecap="round"/>`)
+      paths.push(`<path d="M 0 ${p1Mid} H ${W / 2} V ${toMid} H ${W}" fill="none" stroke="${isDone ? 'var(--green)' : 'var(--border2)'}" stroke-width="1.5" stroke-linejoin="miter" stroke-linecap="square"/>`)
     }
     if (parent2Idx < fromMatches.length) {
       const p2Top = calcTop(fromRoundIndex, parent2Idx)
       const p2Mid = p2Top + CARD_H / 2
       const isDone = fromMatches[parent2Idx].status === 'done'
-      paths.push(`<path d="M 0 ${p2Mid} H ${W / 2} Q ${W * 0.75} ${p2Mid} ${W * 0.85} ${p2Mid + (toMid - p2Mid) * 0.5} T ${W} ${toMid}" fill="none" stroke="${isDone ? 'var(--green)' : 'var(--border2)'}" stroke-width="1.5" stroke-linecap="round"/>`)
+      paths.push(`<path d="M 0 ${p2Mid} H ${W / 2} V ${toMid} H ${W}" fill="none" stroke="${isDone ? 'var(--green)' : 'var(--border2)'}" stroke-width="1.5" stroke-linejoin="miter" stroke-linecap="square"/>`)
     }
   })
 
@@ -204,7 +204,7 @@ function FinalColumn({ finalMatch, thirdMatch }: {
   return (
     <div className="brt-col brt-col-final" style={{ width: COL_W + 30, height: H }}>
       <div className="brt-round-header">
-        <div className="brt-round-name brt-final-name">🏆 Gran Final</div>
+        <div className="brt-round-name brt-final-name">Final</div>
         <div className="brt-round-date">{ROUND_DATES['F']}</div>
       </div>
       <div className="brt-col-body" style={{ position: 'relative', height: H }}>
@@ -215,7 +215,7 @@ function FinalColumn({ finalMatch, thirdMatch }: {
         )}
         {thirdMatch && (
           <div className="brt-match-pos" style={{ top: thirdTop }}>
-            <div className="brt-third-label">🥉 Tercer Puesto</div>
+            <div className="brt-third-label">Tercer Puesto</div>
             <div className="brt-third-date">{ROUND_DATES['3RD']}</div>
             <MatchCard match={thirdMatch} scale="md" />
           </div>
@@ -242,7 +242,7 @@ function SFtoFConnector({ sfMatches, finalMatch }: {
     const sfMid = sfTop + CARD_H / 2
     const isDone = sfMatch.status === 'done'
     const stroke = isDone ? 'var(--green)' : 'var(--border2)'
-    paths.push(`<path d="M 0 ${sfMid} H ${W / 2} Q ${W * 0.75} ${sfMid} ${W * 0.85} ${sfMid + (fMid - sfMid) * 0.5} T ${W} ${fMid}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linecap="round"/>`)
+    paths.push(`<path d="M 0 ${sfMid} H ${W / 2} V ${fMid} H ${W}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="miter" stroke-linecap="square"/>`)
   })
 
   return (

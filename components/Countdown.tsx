@@ -55,7 +55,7 @@ export function Countdown() {
 
   const label = phase === 'before'
     ? 'para el partido inaugural'
-    : 'para la Gran Final · MetLife Stadium, Nueva Jersey'
+    : 'para la Final · MetLife Stadium, Nueva Jersey'
 
   return (
     <div>
