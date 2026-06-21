@@ -21,9 +21,13 @@ export function Topbar() {
   return (
     <header className="topbar">
       <Link href="/" className="brand">
-        <div className="brand-mark">
-          <div className="brand-mark-inner" />
-        </div>
+        <img
+          src="/brand-mark.webp"
+          alt="Mundial 2026"
+          width={34}
+          height={34}
+          className="brand-mark"
+        />
         <div>
           <div className="brand-text">MUNDIAL</div>
           <div className="brand-year">FIFA 2026</div>

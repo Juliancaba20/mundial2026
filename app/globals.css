@@ -54,13 +54,8 @@ button { font-family: var(--body); cursor: pointer; }
 }
 .brand-mark {
   width: 34px; height: 34px; border-radius: 7px;
-  background: linear-gradient(135deg, var(--green) 0%, #007a4d 100%);
-  display: flex; align-items: center; justify-content: center;
+  object-fit: cover; display: block;
   flex-shrink: 0;
-}
-.brand-mark-inner {
-  width: 16px; height: 16px; border-radius: 50%;
-  border: 2px solid rgba(255,255,255,0.9);
 }
 .brand-text { font-family: var(--display); letter-spacing: .08em; font-size: 20px; color: var(--text); line-height: 1; }
 .brand-year { font-size: 11px; color: var(--muted); letter-spacing: .1em; font-weight: 500; margin-top: 2px; text-transform: uppercase; }
