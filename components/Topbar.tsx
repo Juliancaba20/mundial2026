@@ -21,7 +21,9 @@ export function Topbar() {
   return (
     <header className="topbar">
       <Link href="/" className="brand">
-        <div className="brand-mark">⚽</div>
+        <div className="brand-mark">
+          <div className="brand-mark-inner" />
+        </div>
         <div>
           <div className="brand-text">MUNDIAL</div>
           <div className="brand-year">FIFA 2026</div>
@@ -40,7 +42,6 @@ export function Topbar() {
         ))}
       </nav>
 
-      {/* El indicador de "en vivo" se maneja desde el cliente en la página de partidos */}
       <div id="topbar-live" style={{ display: 'none' }} className="topbar-live">
         <span className="live-dot" />
         En vivo
