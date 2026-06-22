@@ -60,6 +60,8 @@ export default async function EquipoPage({ params }: Props) {
     { GK: [], DEF: [], MID: [], FWD: [] }
   )
 
+  const hasSquadSection = squad.length > 0 || !!team.coach
+
   return (
     <>
       <div className="subpage-nav">
@@ -91,14 +93,6 @@ export default async function EquipoPage({ params }: Props) {
           </div>
         </div>
 
-        {/* INFO INSTITUCIONAL: DT */}
-        {team.coach && (
-          <div className="team-info-row">
-            <span className="team-info-label">Director Técnico</span>
-            <span className="team-info-value">{team.coach}</span>
-          </div>
-        )}
-
         {/* DESCRIPCIÓN */}
         {team.description && (
           <p className="team-description">{team.description}</p>
@@ -107,32 +101,44 @@ export default async function EquipoPage({ params }: Props) {
         {/* PARTIDOS */}
         <LiveTeamMatches initialMatches={matches} />
 
-        {/* PLANTEL */}
-        {squad.length > 0 && (
+        {/* PLANTEL + DT */}
+        {hasSquadSection && (
           <div className="squad-section">
             <div className="team-section-title">PLANTEL</div>
-            <div className="squad-grid">
-              {POSITION_ORDER.map(pos => {
-                const players = squadByPosition[pos]
-                if (players.length === 0) return null
-                return (
-                  <div key={pos} className="squad-column">
-                    <div className="squad-pos-label">{POSITION_LABELS[pos]}</div>
-                    {players.map(p => (
-                      <div key={p.number ?? p.name} className="squad-player">
-                        {p.number != null && (
-                          <span className="squad-number">{p.number}</span>
-                        )}
-                        <div className="squad-info">
-                          <span className="squad-name">{p.name}</span>
-                          {p.club && <span className="squad-club">{p.club}</span>}
+
+            {/* DIRECTOR TÉCNICO — card destacada dentro de la sección */}
+            {team.coach && (
+              <div className="squad-coach">
+                <span className="squad-coach-label">Director Técnico</span>
+                <span className="squad-coach-name">{team.coach}</span>
+              </div>
+            )}
+
+            {/* JUGADORES */}
+            {squad.length > 0 && (
+              <div className="squad-grid">
+                {POSITION_ORDER.map(pos => {
+                  const players = squadByPosition[pos]
+                  if (players.length === 0) return null
+                  return (
+                    <div key={pos} className="squad-column">
+                      <div className="squad-pos-label">{POSITION_LABELS[pos]}</div>
+                      {players.map(p => (
+                        <div key={p.number ?? p.name} className="squad-player">
+                          {p.number != null && (
+                            <span className="squad-number">{p.number}</span>
+                          )}
+                          <div className="squad-info">
+                            <span className="squad-name">{p.name}</span>
+                            {p.club && <span className="squad-club">{p.club}</span>}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )
-              })}
-            </div>
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 
