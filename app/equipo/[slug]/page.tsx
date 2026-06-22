@@ -52,7 +52,6 @@ export default async function EquipoPage({ params }: Props) {
   const groupColor = GROUP_COLORS[team.group] ?? 'var(--green)'
   const squad = team.squad ?? []
 
-  // Agrupar plantel por posición
   const squadByPosition = POSITION_ORDER.reduce<Record<Player['position'], Player[]>>(
     (acc, pos) => {
       acc[pos] = squad.filter(p => p.position === pos)
@@ -63,13 +62,12 @@ export default async function EquipoPage({ params }: Props) {
 
   return (
     <>
-      {/* BACK LINK */}
       <div className="subpage-nav">
         <Link href="/grupos" className="back-link">← Volver a grupos</Link>
       </div>
 
       <div className="content-area">
-        {/* HERO DEL EQUIPO */}
+        {/* HERO */}
         <div className="team-hero">
           <TeamFlag code={team.flagCode} name={team.name} size={64} className="team-flag-lg-img" />
           <div>
@@ -87,12 +85,19 @@ export default async function EquipoPage({ params }: Props) {
                 <span className="team-champ-pill">★ Campeona del Mundo</span>
               )}
             </div>
-            {/* LOGRO MUNDIALISTA */}
             {team.worldCupBest && (
-              <div className="team-wcbest">🏆 {team.worldCupBest}</div>
+              <div className="team-wcbest">{team.worldCupBest}</div>
             )}
           </div>
         </div>
+
+        {/* INFO INSTITUCIONAL: DT */}
+        {team.coach && (
+          <div className="team-info-row">
+            <span className="team-info-label">Director Técnico</span>
+            <span className="team-info-value">{team.coach}</span>
+          </div>
+        )}
 
         {/* DESCRIPCIÓN */}
         {team.description && (
@@ -102,7 +107,7 @@ export default async function EquipoPage({ params }: Props) {
         {/* PARTIDOS */}
         <LiveTeamMatches initialMatches={matches} />
 
-        {/* PLANTEL — solo si tiene datos */}
+        {/* PLANTEL */}
         {squad.length > 0 && (
           <div className="squad-section">
             <div className="team-section-title">PLANTEL</div>

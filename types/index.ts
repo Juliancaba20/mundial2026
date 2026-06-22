@@ -20,6 +20,7 @@ export interface Team extends TeamRef {
   confederation: string
   description?: string
   worldCupBest?: string
+  coach?: string
   squad?: Player[]
 }
 
