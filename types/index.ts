@@ -7,11 +7,20 @@ export interface TeamRef {
   slug: string
 }
 
+export interface Player {
+  name: string
+  position: 'GK' | 'DEF' | 'MID' | 'FWD'
+  number?: number
+  club?: string
+}
+
 export interface Team extends TeamRef {
   group: string
   isChampion?: boolean
   confederation: string
   description?: string
+  worldCupBest?: string
+  squad?: Player[]
 }
 
 // ─── Grupos ──────────────────────────────────────────────────────────────────

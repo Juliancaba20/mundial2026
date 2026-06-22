@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { TEAMS, TEAMS_BY_SLUG, BASE_MATCHES } from '@/lib/data'
 import { LiveTeamMatches } from '@/components/LiveTeamMatches'
 import { TeamFlag } from '@/components/TeamFlag'
+import type { Player } from '@/types'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -30,6 +31,15 @@ const GROUP_COLORS: Record<string, string> = {
   I:'#64748b', J:'#C9A84C', K:'#16a34a', L:'#6366f1',
 }
 
+const POSITION_LABELS: Record<Player['position'], string> = {
+  GK:  'Porteros',
+  DEF: 'Defensas',
+  MID: 'Centrocampistas',
+  FWD: 'Delanteros',
+}
+
+const POSITION_ORDER: Player['position'][] = ['GK', 'DEF', 'MID', 'FWD']
+
 export default async function EquipoPage({ params }: Props) {
   const { slug } = await params
   const team = TEAMS_BY_SLUG[slug]
@@ -40,10 +50,20 @@ export default async function EquipoPage({ params }: Props) {
   )
 
   const groupColor = GROUP_COLORS[team.group] ?? 'var(--green)'
+  const squad = team.squad ?? []
+
+  // Agrupar plantel por posición
+  const squadByPosition = POSITION_ORDER.reduce<Record<Player['position'], Player[]>>(
+    (acc, pos) => {
+      acc[pos] = squad.filter(p => p.position === pos)
+      return acc
+    },
+    { GK: [], DEF: [], MID: [], FWD: [] }
+  )
 
   return (
     <>
-      {/* BACK LINK — centrado arriba */}
+      {/* BACK LINK */}
       <div className="subpage-nav">
         <Link href="/grupos" className="back-link">← Volver a grupos</Link>
       </div>
@@ -67,6 +87,10 @@ export default async function EquipoPage({ params }: Props) {
                 <span className="team-champ-pill">★ Campeona del Mundo</span>
               )}
             </div>
+            {/* LOGRO MUNDIALISTA */}
+            {team.worldCupBest && (
+              <div className="team-wcbest">🏆 {team.worldCupBest}</div>
+            )}
           </div>
         </div>
 
@@ -77,6 +101,35 @@ export default async function EquipoPage({ params }: Props) {
 
         {/* PARTIDOS */}
         <LiveTeamMatches initialMatches={matches} />
+
+        {/* PLANTEL — solo si tiene datos */}
+        {squad.length > 0 && (
+          <div className="squad-section">
+            <div className="team-section-title">PLANTEL</div>
+            <div className="squad-grid">
+              {POSITION_ORDER.map(pos => {
+                const players = squadByPosition[pos]
+                if (players.length === 0) return null
+                return (
+                  <div key={pos} className="squad-column">
+                    <div className="squad-pos-label">{POSITION_LABELS[pos]}</div>
+                    {players.map(p => (
+                      <div key={p.number ?? p.name} className="squad-player">
+                        {p.number != null && (
+                          <span className="squad-number">{p.number}</span>
+                        )}
+                        <div className="squad-info">
+                          <span className="squad-name">{p.name}</span>
+                          {p.club && <span className="squad-club">{p.club}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* OTROS EQUIPOS DEL GRUPO */}
         <div style={{ marginTop: 40 }}>
