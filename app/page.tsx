@@ -2,8 +2,10 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Countdown } from '@/components/Countdown'
 import { FeaturedMatchesClient, MatchStripClient } from '@/components/MatchesClient'
-import { BASE_MATCHES, NEWS, TEAMS, FEATURED_TEAM_SLUGS, TEAMS_BY_SLUG } from '@/lib/data'
+import { BASE_MATCHES, TEAMS, FEATURED_TEAM_SLUGS, TEAMS_BY_SLUG } from '@/lib/data'
 import { TeamFlag } from '@/components/TeamFlag'
+import { getAllNoticias } from '@/lib/noticias'
+import { NoticiaCard } from '@/components/NoticiaCard'
 
 export const metadata: Metadata = {
   title: 'Copa Mundial FIFA 2026',
@@ -12,6 +14,8 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   const featuredTeams = FEATURED_TEAM_SLUGS.map(s => TEAMS_BY_SLUG[s]).filter(Boolean)
+  // Las 4 noticias más recientes (orden desc por fecha desde lib/noticias).
+  const noticiasHome = getAllNoticias().slice(0, 4)
 
   return (
     <>
@@ -61,17 +65,11 @@ export default function HomePage() {
         <div className="home-section">
           <div className="section-eyebrow">
             <div className="section-label">Noticias del torneo</div>
+            <Link href="/noticias" className="section-link">Ver todas →</Link>
           </div>
           <div className="news-grid">
-            {NEWS.map(article => (
-              <Link key={article.slug} href={`/noticias/${article.slug}`} className={`news-card${article.featured ? ' featured' : ''}`}>
-                <div className="news-img">{article.emoji}</div>
-                <div className="news-body">
-                  <div className="news-tag">{article.tag}</div>
-                  <div className="news-headline">{article.headline}</div>
-                  <div className="news-meta">{article.date}</div>
-                </div>
-              </Link>
+            {noticiasHome.map(article => (
+              <NoticiaCard key={article.slug} noticia={article} />
             ))}
           </div>
         </div>

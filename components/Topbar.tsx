@@ -8,6 +8,7 @@ const LINKS = [
   { href: '/grupos',        label: 'Grupos' },
   { href: '/partidos',      label: 'Partidos' },
   { href: '/eliminatorias', label: 'Eliminatorias' },
+  { href: '/noticias',      label: 'Noticias' },
 ]
 
 export function Topbar() {

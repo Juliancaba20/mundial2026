@@ -1,4 +1,4 @@
-import type { Team, Group, Match, NewsArticle } from '@/types'
+import type { Team, Group, Match } from '@/types'
 
 // ─── EQUIPOS ─────────────────────────────────────────────────────────────────
 // CORRECCIÓN (auditoría 12 grupos): Eslovenia NO clasificó al Mundial 2026.
@@ -312,41 +312,11 @@ const RAW_MATCHES: RawMatch[] = [
 export const BASE_MATCHES: Match[] = RAW_MATCHES.map(buildMatch)
 
 // ─── NOTICIAS ────────────────────────────────────────────────────────────────
-
-export const NEWS: NewsArticle[] = [
-  {
-    slug: 'argentina-campeona-busca-bicampeonato',
-    tag: 'Análisis', headline: 'Messi busca el único título que le falta: ser campeón dos veces',
-    excerpt: 'La albiceleste llega como gran favorita al Mundial que se juega en suelo americano.',
-    body: `Argentina llega al Mundial 2026 como la gran favorita. Campeona en Qatar 2022, la selección de Lionel Scaloni busca repetir la hazaña en suelo americano.\n\nLionel Messi, a sus 38 años, jugará probablemente su último Mundial. El objetivo es claro: ser el primer argentino en ganar dos Copas del Mundo como jugador.\n\nEl equipo mantiene la base ganadora de Qatar, con Dibu Martínez en el arco, la solidez defensiva de Romero y Lisandro Martínez, y la creatividad de De Paul y Enzo Fernández en el medio. Arriba, además de Messi, Di María y Lautaro Martínez completan un ataque temible.\n\nEl Grupo J, con Argelia, Austria y Jordania, parece asequible. El verdadero desafío llegará en las fases eliminatorias.`,
-    date: '14 jun 2026', emoji: '🇦🇷', featured: true, relatedTeamSlugs: ['argentina'],
-  },
-  {
-    slug: 'cinco-candidatos-al-titulo',
-    tag: 'Favoritos', headline: 'Los 5 candidatos al título según las casas de apuestas',
-    excerpt: 'Argentina, Francia, Brasil, España e Inglaterra lideran los pronósticos.',
-    body: `Las casas de apuestas tienen su veredicto: Argentina, Francia, Brasil, España e Inglaterra son los cinco principales candidatos al título del Mundial 2026.\n\n**Argentina** lidera como campeona defensora. **Francia** tiene el plantel más talentoso de Europa. **Brasil** busca romper el maleficio que la aleja de la copa desde 2002. **España** llega con el mejor fútbol colectivo. **Inglaterra** confía en que por fin "viene a casa".\n\nEl formato de 48 equipos agrega incertidumbre: hay más partidos, más posibilidades de sorpresas, y el desgaste físico es un factor nuevo.`,
-    date: '13 jun 2026', emoji: '🏆', featured: false, relatedTeamSlugs: ['argentina','francia','brasil','espana','inglaterra'],
-  },
-  {
-    slug: 'mundial-48-equipos-el-mas-ambicioso',
-    tag: 'Historia', headline: 'Por qué el Mundial de 48 equipos es el más ambicioso de la historia',
-    excerpt: 'Por primera vez en la historia, 48 selecciones compiten por la copa.',
-    body: `El Mundial 2026 es un torneo histórico en varios sentidos. Por primera vez, 48 selecciones participan en la Copa del Mundo.\n\nTres países sede —Estados Unidos, México y Canadá— albergan 104 partidos en 16 estadios durante 39 días. Es el Mundial más ambicioso logísticamente de la historia.\n\nEl nuevo formato incluye 12 grupos de 4 equipos, donde clasifican los dos primeros de cada grupo y los ocho mejores terceros, totalizando 32 equipos para la fase de 16avos.`,
-    date: '12 jun 2026', emoji: '📖', featured: false, relatedTeamSlugs: [],
-  },
-  {
-    slug: 'metlife-stadium-la-final',
-    tag: 'Sede', headline: 'MetLife Stadium: la final más esperada se jugará en Nueva York',
-    excerpt: 'El estadio de los Giants y los Jets albergará la final del 19 de julio.',
-    body: `El MetLife Stadium de East Rutherford, Nueva Jersey —en el área metropolitana de Nueva York— será el escenario de la gran final del Mundial 2026 el 19 de julio.\n\nCon capacidad para 82.500 espectadores, el estadio que alberga a los Giants y Jets de la NFL se convertirá en el centro del mundo futbolístico.\n\nNueva York es la ciudad más poblada de Estados Unidos y uno de los centros culturales más importantes del planeta. Que la final se juegue allí le da una dimensión histórica especial al torneo.`,
-    date: '11 jun 2026', emoji: '🏟', featured: false, relatedTeamSlugs: [],
-  },
-]
-
-export const NEWS_BY_SLUG = Object.fromEntries(NEWS.map(n => [n.slug, n]))
+// Las noticias se migraron a archivos Markdown en `content/noticias/<slug>/index.md`.
+// Ver `lib/noticias.ts` para la capa de lectura y `NOTICIAS.md` para el flujo editorial.
+// Se mantiene `FEATURED_TEAM_SLUGS` porque lo consume `app/page.tsx` (selecciones destacadas).
 
 export const FEATURED_TEAM_SLUGS = [
-  'argentina','brasil','francia','espana','alemania',
-  'portugal','paises-bajos','inglaterra','estados-unidos','mexico',
+	'argentina','brasil','francia','espana','alemania',
+	'portugal','paises-bajos','inglaterra','estados-unidos','mexico',
 ]

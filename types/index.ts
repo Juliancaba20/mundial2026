@@ -73,6 +73,13 @@ export type BracketRound =
   | '3RD'
 
 // ─── Noticias ────────────────────────────────────────────────────────────────
+//
+// El contenido editorial vive en `content/noticias/<slug>/index.md` como
+// Markdown + frontmatter. `lib/noticias.ts` lo lee en build time y produce
+// instancias de `Noticia`. Ver `NOTICIAS.md` en la raíz del proyecto.
+//
+// `NewsArticle` se conserva solo para referencia histórica/compatibilidad.
+// El sistema actual usa exclusivamente `Noticia`.
 
 export interface NewsArticle {
   slug: string
@@ -84,6 +91,21 @@ export interface NewsArticle {
   emoji: string
   featured: boolean
   relatedTeamSlugs?: string[]
+}
+
+// Modelo de noticia derivado de un archivo Markdown con frontmatter.
+export interface Noticia {
+  slug: string            // deriva del nombre de la carpeta — identidad permanente
+  title: string           // frontmatter: title
+  category: string        // frontmatter: category  (ej: "Análisis", "Sede")
+  date: Date              // frontmatter: date (YYYY-MM-DD → medianoche UTC)
+  excerpt: string         // frontmatter: excerpt — bajada para cards y meta
+  body: string            // cuerpo Markdown crudo — se renderiza con react-markdown
+  image?: string          // frontmatter: image — URL desde raíz: /noticias/<slug>/cover.webp
+  imageAlt?: string       // frontmatter: imageAlt — descripción accesible
+  emoji?: string          // frontmatter: emoji — fallback visual si no hay imagen
+  featured: boolean       // frontmatter: featured — true destaca la card en grids
+  relatedTeamSlugs?: string[] // frontmatter: relatedTeamSlugs — slugs de TEAMS para chips
 }
 
 // ─── ESPN API ─────────────────────────────────────────────────────────────────

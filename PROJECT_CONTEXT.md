@@ -16,11 +16,12 @@
 - Vercel (deploy automático desde GitHub)
 - ESPN Public API (datos de resultados en vivo)
 - flagcdn.com (imágenes de banderas)
+- gray-matter + react-markdown + remark-gfm (contenido editorial en Markdown)
 
 **Estructura de directorios:**
 ```
 app/
-  page.tsx              — Homepage con hero, countdown, partidos destacados
+  page.tsx              — Homepage con hero, countdown, partidos destacados, noticias
   globals.css           — TODO el CSS del proyecto (un solo archivo)
   layout.tsx            — Layout raíz (incluye Topbar)
   grupos/page.tsx       — Grid de los 12 grupos con tablas de posiciones
@@ -28,12 +29,15 @@ app/
   partidos/page.tsx     — Fixture completo con agrupación por fecha
   eliminatorias/page.tsx — Bracket visual de fase eliminatoria
   equipo/[slug]/page.tsx — Página individual de equipo
+  noticias/page.tsx     — Índice de todas las noticias (orden por fecha desc)
+  noticias/[slug]/page.tsx — Detalle de noticia individual (Markdown → HTML)
   api/resultados/route.ts — Endpoint que expone resultados ESPN al cliente
   api/debug/route.ts    — Endpoint de diagnóstico ESPN
 
 components/
-  Topbar.tsx            — Header con navegación
+  Topbar.tsx            — Header con navegación (Inicio, Grupos, Partidos, Eliminatorias, Noticias)
   Countdown.tsx         — Cuenta regresiva con detección de fase del torneo
+  NoticiaCard.tsx        — Card reutilizable de noticia (imagen o emoji fallback)
   StandingsTable.tsx    — Tabla de posiciones con colores por posición
   LiveGroupStandings.tsx — Tabla de posiciones con polling en vivo (client)
   BracketView.tsx       — Visualización del bracket de eliminatorias
@@ -43,14 +47,25 @@ components/
   TeamFlag.tsx          — Bandera de equipo vía flagcdn.com
 
 lib/
-  data.ts               — FUENTE DE VERDAD: equipos, grupos, partidos base, noticias
+  data.ts               — FUENTE DE VERDAD: equipos, grupos, partidos base
+  noticias.ts           — Lectura de noticias desde content/noticias/*.md (build-time)
   espn.ts               — Integración ESPN: fetch, normalización, applyResults
   standings.ts          — Cálculo de posiciones con criterios FIFA
   bracket.ts            — Constructor del bracket de eliminatorias
   thirdPlaceTable.ts    — 495 combinaciones del Anexo C FIFA
 
+content/
+  noticias/             — Contenido editorial (Markdown + frontmatter YAML)
+    <slug>/index.md     — Un archivo por noticia (no se sirve como static)
+
+public/
+  noticias/<slug>/      — Imágenes de portada (cover.webp)
+  flags/                — Banderas SVG de equipos
+
 types/
   index.ts              — Todos los tipos TypeScript del proyecto
+
+NOTICIAS.md             — Guía de autoría de noticias (paso a paso)
 ```
 
 ---
@@ -280,12 +295,25 @@ KnockoutResultsMap = Record<string, { opponent: string; homeScore: number; awayS
 ## Arquitectura de datos
 
 ### Fuente de verdad única
-**`lib/data.ts`** es el único lugar donde se definen datos estáticos:
+**`lib/data.ts`** es la fuente de verdad para datos deportivos:
 - `TEAMS` — array de todos los equipos con slug, nombre, flagCode, etc.
 - `TEAMS_BY_SLUG` — map slug → Team para acceso O(1)
 - `GROUPS` — definición de los 12 grupos
 - `BASE_MATCHES` — los 104 partidos del torneo con kickoffs
-- `NEWS`, `FEATURED_TEAM_SLUGS` — contenido editorial
+- `FEATURED_TEAM_SLUGS` — slugs de equipos destacados en la home
+
+### Noticias — contenido editorial
+Las noticias **no** viven en `lib/data.ts`. Usan archivos Markdown en `content/noticias/<slug>/index.md` con frontmatter YAML. Ver `NOTICIAS.md` para el flujo editorial completo.
+
+- `lib/noticias.ts` — Lee `content/noticias/` en build time con `gray-matter`
+- `getAllNoticias()` — Todas las noticias ordenadas por fecha DESC
+- `getNoticiaBySlug(slug)` — Acceso O(1) por slug para la página de detalle
+- `getNoticiaSlugs()` — Slugs para `generateStaticParams` (SSG)
+- `getNoticiasRecientes(limit, excludeSlug?)` — Las N más recientes (home, relacionados)
+- `formatFecha(date)` — Formatea `Date` a "13 jun 2026"
+- `components/NoticiaCard.tsx` — Card reutilizable (imagen o emoji fallback)
+
+**Flujo para agregar noticia:** crear carpeta → pegar `index.md` → (opcional) agregar `cover.webp` → commit. No se toca código.
 
 ### kickoff como fuente temporal única
 ```typescript
@@ -399,6 +427,6 @@ npx tsc --noEmit && npm run build
 
 ---
 
-*Última actualización: junio 2026*
+*Última actualización: junio 2026 (sección de noticias migrada a Markdown)*
 *Repo: https://github.com/Juliancaba20/mundial2026*
 *Producción: https://mundial2026-blond-pi.vercel.app*
