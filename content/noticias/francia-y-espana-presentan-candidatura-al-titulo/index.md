@@ -1,4 +1,4 @@
-\---
+---
 
 title: "Francia y España presentan credenciales: goleadas que alimentan el sueño mundialista"
 
@@ -16,21 +16,21 @@ emoji: "🇫🇷"
 
 featured: false
 
-relatedTeamSlugs: \[francia, espana, irak, arabia-saudita]
+relatedTeamSlugs: [francia, espana, irak, arabia-saudita]
 
-\---
-
-
-
-La segunda jornada de la fase de grupos dejó una señal clara: \*\*Francia y España están listas para pelear por el título\*\*.
+---
 
 
 
-\## Francia respondió con autoridad
+La segunda jornada de la fase de grupos dejó una señal clara: **Francia y España están listas para pelear por el título**.
 
 
 
-La selección francesa derrotó \*\*3-0 a Irak\*\* en Filadelfia y volvió a demostrar la profundidad de una plantilla que figura entre las más talentosas del torneo.
+## Francia respondió con autoridad
+
+
+
+La selección francesa derrotó **3-0 a Irak** en Filadelfia y volvió a demostrar la profundidad de una plantilla que figura entre las más talentosas del torneo.
 
 
 
@@ -38,11 +38,11 @@ El conjunto europeo controló el partido desde el inicio y resolvió el encuentr
 
 
 
-\## España disipó las dudas
+## España disipó las dudas
 
 
 
-Después de un debut por debajo de las expectativas, España reaccionó con una contundente victoria por \*\*4-0 ante Arabia Saudita\*\*.
+Después de un debut por debajo de las expectativas, España reaccionó con una contundente victoria por **4-0 ante Arabia Saudita**.
 
 
 
@@ -50,7 +50,7 @@ La actuación de La Roja devolvió la confianza a sus aficionados y reafirmó su
 
 
 
-\## Dos gigantes toman impulso
+## Dos gigantes toman impulso
 
 
 
@@ -58,17 +58,17 @@ Ambas selecciones llegan al tramo decisivo de la fase de grupos con sensaciones 
 
 
 
-\- Francia goleó 3-0 a Irak.
+- Francia goleó 3-0 a Irak.
 
-\- España venció 4-0 a Arabia Saudita.
+- España venció 4-0 a Arabia Saudita.
 
-\- Los dos equipos suman confianza.
+- Los dos equipos suman confianza.
 
-\- Europa mantiene varios aspirantes al título.
+- Europa mantiene varios aspirantes al título.
 
 
 
-\## El mensaje para el resto del Mundial
+## El mensaje para el resto del Mundial
 
 
 
