@@ -1,0 +1,47 @@
+name: Auto-publicar noticias Mundial 2026
+
+on:
+  schedule:
+    # 11:00 UTC = 08:00 AM Argentina (UTC-3)
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+    # Permite ejecución manual desde GitHub Actions → Run workflow
+
+permissions:
+  contents: write
+
+jobs:
+  publicar-noticias:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: automation/package.json
+
+      - name: Instalar dependencias (automation)
+        working-directory: automation
+        run: npm install
+
+      - name: Ejecutar sistema de auto-publicación
+        working-directory: automation
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          # Para usar Gemini en su lugar, setear GEMINI_API_KEY y cambiar
+          # CONFIG.llm.provider a 'gemini' en automation/config.ts
+          # GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: npx tsx scheduler.ts
+
+      - name: Resultado
+        if: always()
+        run: |
+          echo "Workflow finalizado. Ver logs para detalle de noticias publicadas."

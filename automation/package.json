@@ -1,0 +1,19 @@
+{
+  "name": "mundial-automation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema de auto-publicación de noticias para mundial2026",
+  "type": "module",
+  "scripts": {
+    "run": "npx tsx scheduler.ts",
+    "test-fetch": "npx tsx -e \"import('./fetch/index.ts').then(m => m.fetchNews()).then(a => console.log(a.length + ' artículos'))\""
+  },
+  "dependencies": {
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
