@@ -1,5 +1,5 @@
 name: Auto-publicar noticias Mundial 2026
-
+ 
 on:
   schedule:
     # 11:00 UTC = 08:00 AM Argentina (UTC-3)
