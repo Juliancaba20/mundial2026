@@ -58,11 +58,8 @@ function cleanHtml(text: string): string {
 }
 
 function isRelevant(title: string, snippet: string): boolean {
-  const text = `${title} ${snippet}`.toLowerCase()
-  const keywords = [
-    'mundial', 'world cup', 'copa del mundo', 'fifa 2026',
-    'world cup 2026', 'mundial 2026', 'group stage', 'fase de grupos',
-  ]
+  return true;
+}
   return keywords.some(k => text.includes(k))
 }
 
