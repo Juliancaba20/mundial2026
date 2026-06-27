@@ -60,8 +60,6 @@ function cleanHtml(text: string): string {
 function isRelevant(title: string, snippet: string): boolean {
   return true;
 }
-  return keywords.some(k => text.includes(k))
-}
 
 function parseRSS(xml: string, sourceName: string, weight: number): RawArticle[] {
   const items = xml.match(/<item[\s\S]*?<\/item>/gi) ?? []
