@@ -23,11 +23,11 @@ export interface GeneratedArticle {
 const SYSTEM_PROMPT = `Sos redactor de un sitio web del Mundial de Fútbol 2026 en español rioplatense.
 
 REGLAS ABSOLUTAS — NO NEGOCIABLES:
-1. Solo usás información que esté EXPLÍCITAMENTE en las fuentes proporcionadas.
-2. NUNCA inventás resultados, goles, asistencias, tarjetas ni declaraciones.
-3. NUNCA agregás datos que no estén en el texto fuente.
-4. Si un dato no está en las fuentes, simplemente no lo mencionás.
-5. El tono es periodístico, directo, sin adjetivos vacíos.
+1. Redactás a partir de la información de la fuente proporcionada.
+2. NUNCA inventás resultados, goles, asistencias, tarjetas ni declaraciones concretas.
+3. Podés agregar contexto general del torneo (formato, grupos, sede) para enriquecer el artículo, pero no datos específicos de partidos que no estén en la fuente.
+4. El tono es periodístico, directo, sin adjetivos vacíos.
+5. El cuerpo DEBE tener mínimo 120 palabras. Si la fuente es corta, expandís con contexto relevante del Mundial 2026.
 6. Respondés SOLO con JSON válido, sin markdown, sin texto adicional.`
 
 function buildPrompt(
@@ -43,7 +43,7 @@ function buildPrompt(
 
   return `Fecha de hoy: ${today}
 
-FUENTE (usá ÚNICAMENTE esta información):
+FUENTE:
 Título: ${article.title}
 Medio: ${article.sourceName}
 Resumen: ${article.snippet}
@@ -59,7 +59,7 @@ Generá un JSON con este schema exacto (sin campos extra):
   "relatedTeamSlugs": ["array — slugs de equipos mencionados, SOLO de esta lista: ${validSlugs}. Array vacío [] si ninguno aplica"],
   "imageAlt": "string — descripción de imagen de estadio o ambiente del Mundial, SIN mencionar jugadores específicos",
   "imagePrompt": "string en INGLÉS — para generación de imagen. Describir estadio, banderas, ambiente. Sin jugadores, sin texto, sin marcadores",
-  "body": "string — artículo en Markdown. Min 150 palabras. Usar ## para subtítulos, **negritas** para datos clave, listas con - cuando aplique. Solo información de la fuente."
+  "body": "string — artículo en Markdown, MÍNIMO 120 palabras. Usar ## para subtítulos, **negritas** para datos clave, listas con - cuando aplique. Si la fuente es escasa, completá con contexto general del torneo (sede, formato, grupos) pero NO inventés resultados ni declaraciones concretas."
 }
 
 Respondé SOLO con el JSON. Sin backticks, sin texto antes ni después.`
@@ -91,14 +91,12 @@ function validate(article: GeneratedArticle, slug: string): void {
   if (missing.length > 0) {
     throw new Error(`Campos faltantes en artículo ${slug}: ${missing.join(', ')}`)
   }
-  if (article.body.split(' ').length < 80) {
-    throw new Error(`Cuerpo demasiado corto en artículo ${slug} (< 80 palabras)`)
+  if (article.body.split(' ').length < 50) {
+    throw new Error(`Cuerpo demasiado corto en artículo ${slug} (< 50 palabras)`)
   }
   if (!CONFIG.categories.includes(article.category as typeof CONFIG.categories[number])) {
-    // Normalizar a la categoría más cercana
     article.category = 'Noticias de selecciones'
   }
-  // Filtrar relatedTeamSlugs a solo slugs válidos
   article.relatedTeamSlugs = (article.relatedTeamSlugs ?? [])
     .filter(s => (CONFIG.teamSlugs as readonly string[]).includes(s))
 }
@@ -133,10 +131,8 @@ export async function generateArticle(
 
   const article = parseJSON(response)
 
-  // Sanitizar slug
   article.slug = sanitizeSlug(article.slug || rawArticle.title)
 
-  // Validar campos y datos
   validate(article, article.slug)
 
   logger.success(`Artículo generado: ${article.slug}`)
