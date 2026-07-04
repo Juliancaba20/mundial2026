@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { motion } from 'motion/react'
 
 // La final del Mundial 2026 es el 19 de julio en Nueva Jersey
 const FINAL_DATE = new Date('2026-07-19T18:00:00-04:00')
@@ -47,9 +48,13 @@ export function Countdown() {
 
   if (phase === 'after') {
     return (
-      <div style={{ fontFamily: 'var(--display)', fontSize: 32, color: 'var(--green)', letterSpacing: '.04em' }}>
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        style={{ fontFamily: 'var(--display)', fontSize: 32, color: 'var(--green)', letterSpacing: '.04em' }}
+      >
         ¡EL MUNDIAL HA TERMINADO!
-      </div>
+      </motion.div>
     )
   }
 
@@ -57,18 +62,86 @@ export function Countdown() {
     ? 'para el partido inaugural'
     : 'para la Final · MetLife Stadium, Nueva Jersey'
 
+  const containerVariants = {
+    hidden: { opacity: 0, y: 15 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.6,
+        staggerChildren: 0.1,
+      },
+    },
+  } as const
+
+  const itemVariants = {
+    hidden: { opacity: 0, scale: 0.9 },
+    visible: { opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 300, damping: 20 } },
+  } as const
+
   return (
-    <div>
-      <p className="cd-event-label">{label}</p>
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+    >
+      <motion.p className="cd-event-label" variants={itemVariants}>{label}</motion.p>
       <div className="hero-countdown">
-        <div className="cd-unit"><span className="cd-num">{t.d}</span><span className="cd-label">días</span></div>
-        <span className="cd-sep">:</span>
-        <div className="cd-unit"><span className="cd-num">{t.h}</span><span className="cd-label">horas</span></div>
-        <span className="cd-sep">:</span>
-        <div className="cd-unit"><span className="cd-num">{t.m}</span><span className="cd-label">minutos</span></div>
-        <span className="cd-sep">:</span>
-        <div className="cd-unit"><span className="cd-num">{t.s}</span><span className="cd-label">segundos</span></div>
+        <motion.div className="cd-unit" variants={itemVariants} whileHover={{ scale: 1.08 }} transition={{ type: 'spring', stiffness: 400, damping: 10 }}>
+          <motion.span
+            key={t.d}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="cd-num"
+          >
+            {t.d}
+          </motion.span>
+          <span className="cd-label">días</span>
+        </motion.div>
+        
+        <motion.span className="cd-sep" variants={itemVariants}>:</motion.span>
+        
+        <motion.div className="cd-unit" variants={itemVariants} whileHover={{ scale: 1.08 }} transition={{ type: 'spring', stiffness: 400, damping: 10 }}>
+          <motion.span
+            key={t.h}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="cd-num"
+          >
+            {t.h}
+          </motion.span>
+          <span className="cd-label">horas</span>
+        </motion.div>
+        
+        <motion.span className="cd-sep" variants={itemVariants}>:</motion.span>
+        
+        <motion.div className="cd-unit" variants={itemVariants} whileHover={{ scale: 1.08 }} transition={{ type: 'spring', stiffness: 400, damping: 10 }}>
+          <motion.span
+            key={t.m}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="cd-num"
+          >
+            {t.m}
+          </motion.span>
+          <span className="cd-label">minutos</span>
+        </motion.div>
+        
+        <motion.span className="cd-sep" variants={itemVariants}>:</motion.span>
+        
+        <motion.div className="cd-unit" variants={itemVariants} whileHover={{ scale: 1.08 }} transition={{ type: 'spring', stiffness: 400, damping: 10 }}>
+          <motion.span
+            key={t.s}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="cd-num"
+          >
+            {t.s}
+          </motion.span>
+          <span className="cd-label">segundos</span>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   )
 }
+

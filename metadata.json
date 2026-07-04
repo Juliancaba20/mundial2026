@@ -1,0 +1,8 @@
+{
+  "name": "Mundial 2026",
+  "description": "Sitio web completo de seguimiento del Mundial 2026 con resultados en vivo, tabla de posiciones, fixture completo, bracket de eliminatorias y noticias.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

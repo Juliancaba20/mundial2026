@@ -102,9 +102,12 @@ export async function GET() {
       totalEvents += events.length
 
       const eventReports: unknown[] = []
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const ev of events as any[]) {
         const comp = ev.competitions?.[0]
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const ht = comp?.competitors?.find((c: any) => c.homeAway === 'home')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const at = comp?.competitors?.find((c: any) => c.homeAway === 'away')
         const htName = ht?.team?.displayName ?? '?'
         const atName = at?.team?.displayName ?? '?'

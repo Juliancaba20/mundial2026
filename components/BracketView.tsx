@@ -6,6 +6,8 @@ import type { BracketMatch, BracketRound, BracketSlot, LiveResultsMap, KnockoutR
 import { buildBracket, ROUND_LABELS, ROUND_DATES } from '@/lib/bracket'
 import { BASE_MATCHES } from '@/lib/data'
 import { TeamFlag } from './TeamFlag'
+import { motion } from 'motion/react'
+
 
 // ─── Aplicar resultados ESPN al array de partidos base ────────────────────────
 function applyResults(matches: Match[], results: LiveResultsMap): Match[] {
@@ -21,14 +23,21 @@ function applyResults(matches: Match[], results: LiveResultsMap): Match[] {
 function useLocalKickoff(kickoff?: string): { dayLabel: string; time: string } | null {
   const [value, setValue] = useState<{ dayLabel: string; time: string } | null>(null)
   useEffect(() => {
-    if (!kickoff) { setValue(null); return }
+    if (!kickoff) {
+      setTimeout(() => setValue(null), 0)
+      return
+    }
     const d = new Date(kickoff)
-    if (isNaN(d.getTime())) { setValue(null); return }
+    if (isNaN(d.getTime())) {
+      setTimeout(() => setValue(null), 0)
+      return
+    }
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-    setValue({
+    const calculated = {
       dayLabel: d.toLocaleDateString('es', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' }),
       time: d.toLocaleTimeString('es', { timeZone: tz, hour: '2-digit', minute: '2-digit' }),
-    })
+    }
+    setTimeout(() => setValue(calculated), 0)
   }, [kickoff])
   return value
 }
@@ -81,7 +90,14 @@ function MatchCard({ match, scale = 'sm', highlight = false }: {
   }
 
   return (
-    <div className={`br-match br-scale-${scale}${highlight ? ' br-match-highlight' : ''}${isLive ? ' br-match-live' : ''}${isDone ? ' br-match-done' : ''}`}>
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      viewport={{ once: true, margin: '-20px' }}
+      whileHover={{ scale: 1.03, y: -2 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      className={`br-match br-scale-${scale}${highlight ? ' br-match-highlight' : ''}${isLive ? ' br-match-live' : ''}${isDone ? ' br-match-done' : ''}`}
+    >
       <div className="br-match-date">{headerContent}</div>
       <SlotRow slot={match.home} score={homeScore}
         isWinner={isDone && homeScore !== undefined && awayScore !== undefined && Number(homeScore) > Number(awayScore)}
@@ -90,7 +106,7 @@ function MatchCard({ match, scale = 'sm', highlight = false }: {
       <SlotRow slot={match.away} score={awayScore}
         isWinner={isDone && homeScore !== undefined && awayScore !== undefined && Number(awayScore) > Number(homeScore)}
         scale={scale} />
-    </div>
+    </motion.div>
   )
 }
 
@@ -300,7 +316,11 @@ function BracketMobileTabs({ bracket }: { bracket: BracketMatch[] }) {
     const activeRound = order.find(r =>
       bracket.some(m => m.round === r && (m.status === 'pending' || m.status === 'live'))
     )
-    if (activeRound) setActive(activeRound)
+    if (activeRound) {
+      setTimeout(() => {
+        setActive(activeRound)
+      }, 0)
+    }
   }, [bracket])
 
   const matches = bracket.filter(m => m.round === active)
@@ -309,11 +329,32 @@ function BracketMobileTabs({ bracket }: { bracket: BracketMatch[] }) {
   return (
     <div className="brm-root">
       <div className="brm-tabs">
-        {MOBILE_ROUNDS.map(r => (
-          <button key={r} className={`brm-tab${active === r ? ' active' : ''}`} onClick={() => setActive(r)}>
-            {MOBILE_LABELS[r]}
-          </button>
-        ))}
+        {MOBILE_ROUNDS.map(r => {
+          const isSelected = active === r
+          return (
+            <button
+              key={r}
+              className={`brm-tab${isSelected ? ' active' : ''}`}
+              onClick={() => setActive(r)}
+              style={{ position: 'relative', background: isSelected ? 'transparent' : undefined }}
+            >
+              <span style={{ position: 'relative', zIndex: 2 }}>{MOBILE_LABELS[r]}</span>
+              {isSelected && (
+                <motion.span
+                  layoutId="activeBracketTab"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'var(--green)',
+                    zIndex: 1,
+                    borderRadius: 6,
+                  }}
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+            </button>
+          )
+        })}
       </div>
       <div className="brm-date">{ROUND_DATES[active]}</div>
       <div className="brm-matches">
@@ -340,7 +381,9 @@ export function BracketView() {
   }, [])
 
   useEffect(() => {
-    fetchAndRebuild()
+    setTimeout(() => {
+      fetchAndRebuild()
+    }, 0)
     const id = setInterval(fetchAndRebuild, 60_000)
     return () => clearInterval(id)
   }, [fetchAndRebuild])

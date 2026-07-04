@@ -55,10 +55,17 @@ export function MatchTime({ kickoff, status, clock, date }: Props) {
 
   useEffect(() => {
     // Calcular hora local solo en el browser
-    setLocalTime(formatLocalTime(kickoff))
+    const local = formatLocalTime(kickoff)
+    const initialCountdown = status === 'pending' ? getCountdown(kickoff) : null
+
+    setTimeout(() => {
+      setLocalTime(local)
+      if (status === 'pending') {
+        setCountdown(initialCountdown)
+      }
+    }, 0)
 
     if (status === 'pending') {
-      setCountdown(getCountdown(kickoff))
       const id = setInterval(() => setCountdown(getCountdown(kickoff)), 30_000)
       return () => clearInterval(id)
     }

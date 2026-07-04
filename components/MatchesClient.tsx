@@ -7,6 +7,8 @@ import { buildBracket, ROUND_LABELS, ROUND_DATES } from '@/lib/bracket'
 import { MatchRow } from './MatchRow'
 import { BracketMatchRow } from './BracketMatchRow'
 import { TeamFlag } from './TeamFlag'
+import { motion } from 'motion/react'
+
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -86,8 +88,10 @@ export function MatchesClient({ groupFilter }: Props) {
     for (const m of BASE_MATCHES) {
       map[m.id] = getLocalDateLabel(m.kickoff)
     }
-    setLocalDateMap(map)
-    fetchResults()
+    setTimeout(() => {
+      setLocalDateMap(map)
+      fetchResults()
+    }, 0)
     const id = setInterval(fetchResults, 60_000)
     return () => clearInterval(id)
   }, [fetchResults])
@@ -308,6 +312,60 @@ export function MatchesClient({ groupFilter }: Props) {
   )
 }
 
+function HeroCard({ m }: { m: Match }) {
+  const isLive = m.status === 'live'
+  const isDone = m.status === 'done'
+  const scoreText = m.status === 'pending' ? null : m.score
+
+  return (
+    <motion.a
+      initial={{ opacity: 0, scale: 0.98, y: 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      whileHover={{ y: -4, scale: 1.005 }}
+      whileTap={{ scale: 0.995 }}
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+      href="/partidos"
+      className={`match-hero-card${isLive ? ' is-live' : ''}${isDone ? ' is-done-hero' : ''}`}
+      style={{ textDecoration: 'none', display: 'block' }}
+    >
+      <div className="mh-top">
+        <span className="mh-group">Grupo {m.group}</span>
+        {isLive && (
+          <span className="mh-badge-live"><span className="live-dot" style={{ width: 6, height: 6 }} /> EN VIVO {m.clock}</span>
+        )}
+        {isDone && <span className="mh-badge-done">Partido finalizado</span>}
+        {!isLive && !isDone && <span className="mh-badge-next">Próximo · {m.date}</span>}
+      </div>
+
+      <div className="mh-teams">
+        <div className="mh-team">
+          <TeamFlag code={m.home.flagCode} name={m.home.name} size={48} className="mh-flag" />
+          <span className="mh-name">{m.home.name}</span>
+        </div>
+
+        <div className="mh-score-area">
+          {scoreText
+            ? <div className={`mh-score${isLive ? ' live' : ''}`}>{scoreText}</div>
+            : <div className="mh-vs">VS</div>
+          }
+          {!isLive && !isDone && m.kickoff && (
+            <div className="mh-kickoff-time">
+              {new Date(m.kickoff).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}
+            </div>
+          )}
+        </div>
+
+        <div className="mh-team right">
+          <TeamFlag code={m.away.flagCode} name={m.away.name} size={48} className="mh-flag" />
+          <span className="mh-name">{m.away.name}</span>
+        </div>
+      </div>
+
+      <div className="mh-venue">{m.venue}</div>
+    </motion.a>
+  )
+}
+
 // ── Partido héroe + cards secundarias para la home ───────────────────────────
 export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Match[] }) {
   const [matches, setMatches] = useState<Match[]>(initialMatches)
@@ -322,7 +380,9 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
   }, [initialMatches])
 
   useEffect(() => {
-    fetchAndUpdate()
+    setTimeout(() => {
+      fetchAndUpdate()
+    }, 0)
     const id = setInterval(fetchAndUpdate, 60_000)
     return () => clearInterval(id)
   }, [fetchAndUpdate])
@@ -340,51 +400,6 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
       return m.status === 'pending' || m.status === 'done'
     })
     .slice(0, 5)
-
-  function HeroCard({ m }: { m: Match }) {
-    const isLive = m.status === 'live'
-    const isDone = m.status === 'done'
-    const scoreText = m.status === 'pending' ? null : m.score
-
-    return (
-      <a href="/partidos" className={`match-hero-card${isLive ? ' is-live' : ''}${isDone ? ' is-done-hero' : ''}`} style={{ textDecoration: 'none' }}>
-        <div className="mh-top">
-          <span className="mh-group">Grupo {m.group}</span>
-          {isLive && (
-            <span className="mh-badge-live"><span className="live-dot" style={{ width: 6, height: 6 }} /> EN VIVO {m.clock}</span>
-          )}
-          {isDone && <span className="mh-badge-done">Partido finalizado</span>}
-          {!isLive && !isDone && <span className="mh-badge-next">Próximo · {m.date}</span>}
-        </div>
-
-        <div className="mh-teams">
-          <div className="mh-team">
-            <TeamFlag code={m.home.flagCode} name={m.home.name} size={48} className="mh-flag" />
-            <span className="mh-name">{m.home.name}</span>
-          </div>
-
-          <div className="mh-score-area">
-            {scoreText
-              ? <div className={`mh-score${isLive ? ' live' : ''}`}>{scoreText}</div>
-              : <div className="mh-vs">VS</div>
-            }
-            {!isLive && !isDone && m.kickoff && (
-              <div className="mh-kickoff-time">
-                {new Date(m.kickoff).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}
-              </div>
-            )}
-          </div>
-
-          <div className="mh-team right">
-            <TeamFlag code={m.away.flagCode} name={m.away.name} size={48} className="mh-flag" />
-            <span className="mh-name">{m.away.name}</span>
-          </div>
-        </div>
-
-        <div className="mh-venue">{m.venue}</div>
-      </a>
-    )
-  }
 
   return (
     <div className="featured-section">
@@ -404,7 +419,18 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
               : <div className={`fm-score-center${m.status === 'live' ? ' live' : ''}`}>{m.score}</div>
 
             return (
-              <a key={m.id} href="/partidos" className={`fm-card${m.status === 'live' ? ' is-live' : ''}${m.status === 'done' ? ' is-done-card' : ''}`} style={{ textDecoration: 'none' }}>
+              <motion.a
+                key={m.id}
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-20px' }}
+                whileHover={{ y: -4, scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+                href="/partidos"
+                className={`fm-card${m.status === 'live' ? ' is-live' : ''}${m.status === 'done' ? ' is-done-card' : ''}`}
+                style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column' }}
+              >
                 <div className="fm-top">
                   <span className="fm-group">Grupo {m.group}</span>
                   {badge}
@@ -421,7 +447,7 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
                   </div>
                 </div>
                 <div className="fm-venue">{m.venue}</div>
-              </a>
+              </motion.a>
             )
           })}
         </div>
@@ -444,7 +470,9 @@ export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }
   }, [initialMatches])
 
   useEffect(() => {
-    fetchAndUpdateStrip()
+    setTimeout(() => {
+      fetchAndUpdateStrip()
+    }, 0)
     const id = setInterval(fetchAndUpdateStrip, 60_000)
     return () => clearInterval(id)
   }, [fetchAndUpdateStrip])
@@ -470,7 +498,14 @@ export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }
         <div className={`hm-label${isLiveLabel ? ' live' : ''}`}>{labelText}</div>
         <div style={{ display: 'flex', gap: 0, alignItems: 'center' }}>
           {toShow.map(m => (
-            <a key={m.id} href="/partidos" className={`hm-card${m.status === 'live' ? ' active-live' : ''}`} style={{ textDecoration: 'none' }}>
+            <motion.a
+              key={m.id}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              href="/partidos"
+              className={`hm-card${m.status === 'live' ? ' active-live' : ''}`}
+              style={{ textDecoration: 'none' }}
+            >
               <div className="hm-team">
                 <TeamFlag code={m.home.flagCode} name={m.home.name} size={18} className="hm-flag-img" />
                 <span className="hm-name">{m.home.name}</span>
@@ -483,7 +518,7 @@ export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }
                 <TeamFlag code={m.away.flagCode} name={m.away.name} size={18} className="hm-flag-img" />
                 <span className="hm-name">{m.away.name}</span>
               </div>
-            </a>
+            </motion.a>
           ))}
         </div>
       </div>

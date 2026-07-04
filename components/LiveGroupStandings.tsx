@@ -66,7 +66,9 @@ export function LiveGroupStandings({ groupLetter, initialMatches }: Props) {
   }, [groupLetter, initialMatches])
 
   useEffect(() => {
-    fetchResults()
+    setTimeout(() => {
+      fetchResults()
+    }, 0)
     const id = setInterval(fetchResults, 60_000)
     return () => clearInterval(id)
   }, [fetchResults])

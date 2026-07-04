@@ -1,6 +1,9 @@
+'use client'
+
 import type { BracketMatch, BracketSlot } from '@/types'
 import { TeamFlag } from './TeamFlag'
 import { MatchTime } from './MatchTime'
+import { motion } from 'motion/react'
 
 // Renderiza un slot de bracket (equipo real o placeholder con label)
 function SlotDisplay({ slot, side }: { slot: BracketSlot; side: 'home' | 'away' }) {
@@ -66,7 +69,14 @@ export function BracketMatchRow({ match: m, roundLabel }: Props) {
   const dateFallback = m.date
 
   return (
-    <div className={rowClass}>
+    <motion.div
+      initial={{ opacity: 0, x: -8 }}
+      whileInView={{ opacity: 1, x: 0 }}
+      viewport={{ once: true, margin: '-20px' }}
+      whileHover={{ y: -2, scale: 1.005, borderColor: 'rgba(255, 255, 255, 0.14)' }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
+      className={rowClass}
+    >
       {/* Etiqueta de ronda (opcional) */}
       {roundLabel && (
         <div className="m-group-tag bm-round-tag">{roundLabel}</div>
@@ -99,6 +109,7 @@ export function BracketMatchRow({ match: m, roundLabel }: Props) {
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
+

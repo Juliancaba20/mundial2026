@@ -1,7 +1,10 @@
+'use client'
+
 import Link from 'next/link'
 import type { Match } from '@/types'
 import { MatchTime } from './MatchTime'
 import { TeamFlag } from './TeamFlag'
+import { motion } from 'motion/react'
 
 interface Props {
   match: Match
@@ -16,12 +19,19 @@ export function MatchRow({ match: m, showGroup = true }: Props) {
       : <div className="m-score-box pending">vs</div>
 
   return (
-    <div className={[
-      'match-row',
-      m.isArgentina  ? 'arg'     : '',
-      m.status === 'live' ? 'is-live' : '',
-      m.status === 'done' ? 'is-done' : '',
-    ].filter(Boolean).join(' ')}>
+    <motion.div
+      initial={{ opacity: 0, x: -8 }}
+      whileInView={{ opacity: 1, x: 0 }}
+      viewport={{ once: true, margin: '-20px' }}
+      whileHover={{ y: -2, scale: 1.005, borderColor: 'rgba(255, 255, 255, 0.14)' }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
+      className={[
+        'match-row',
+        m.isArgentina  ? 'arg'     : '',
+        m.status === 'live' ? 'is-live' : '',
+        m.status === 'done' ? 'is-done' : '',
+      ].filter(Boolean).join(' ')}
+    >
 
       {/* Grupo */}
       {showGroup && <div className="m-group-tag">GR.{m.group}</div>}
@@ -53,6 +63,7 @@ export function MatchRow({ match: m, showGroup = true }: Props) {
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
+
