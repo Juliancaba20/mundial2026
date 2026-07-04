@@ -492,34 +492,53 @@ export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }
   else if (recent.length) { toShow = recent; labelText = 'ÚLTIMOS' }
   else { toShow = upcoming; labelText = 'PRÓXIMOS' }
 
+  if (!toShow.length) return null
+
+  // Para crear un bucle infinito continuo en el marquee, repetimos el array para que cubra todo el ancho de pantalla.
+  // El número de repeticiones debe ser par para que la animación con translate3d(-50%, 0, 0) sea visualmente idéntica al inicio.
+  const minItems = 12
+  const rawRepeatTimes = Math.ceil(minItems / toShow.length) * 2
+  const repeatTimes = rawRepeatTimes % 2 === 0 ? rawRepeatTimes : rawRepeatTimes + 1
+
+  const marqueeItems: Match[] = []
+  for (let i = 0; i < repeatTimes; i++) {
+    marqueeItems.push(...toShow)
+  }
+
+  const showLabel = labelText !== 'ÚLTIMOS'
+
   return (
     <div className="hero-match-strip">
-      <div className="hero-match-inner">
-        <div className={`hm-label${isLiveLabel ? ' live' : ''}`}>{labelText}</div>
-        <div style={{ display: 'flex', gap: 0, alignItems: 'center' }}>
-          {toShow.map(m => (
-            <motion.a
-              key={m.id}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              href="/partidos"
-              className={`hm-card${m.status === 'live' ? ' active-live' : ''}`}
-              style={{ textDecoration: 'none' }}
-            >
-              <div className="hm-team">
-                <TeamFlag code={m.home.flagCode} name={m.home.name} size={18} className="hm-flag-img" />
-                <span className="hm-name">{m.home.name}</span>
-              </div>
-              <div className="hm-score-box">
-                <div className={`hm-score${m.status === 'live' ? ' live-score' : ''}`}>{m.score ?? 'vs'}</div>
-                <div className={`hm-time${m.status === 'live' ? ' live-time' : ''}`}>{m.status === 'live' ? m.clock : m.date}</div>
-              </div>
-              <div className="hm-team right">
-                <TeamFlag code={m.away.flagCode} name={m.away.name} size={18} className="hm-flag-img" />
-                <span className="hm-name">{m.away.name}</span>
-              </div>
-            </motion.a>
-          ))}
+      <div className="hero-match-inner" style={{ padding: showLabel ? '0 0 0 24px' : '0', overflow: 'hidden' }}>
+        {showLabel && (
+          <div className={`hm-label${isLiveLabel ? ' live' : ''}`}>{labelText}</div>
+        )}
+        <div className="marquee-container">
+          <div className="marquee-content" style={{ animationDuration: `${toShow.length * 5}s` }}>
+            {marqueeItems.map((m, idx) => (
+              <motion.a
+                key={`${m.id}-${idx}`}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                href="/partidos"
+                className={`hm-card${m.status === 'live' ? ' active-live' : ''}`}
+                style={{ textDecoration: 'none' }}
+              >
+                <div className="hm-team">
+                  <TeamFlag code={m.home.flagCode} name={m.home.name} size={18} className="hm-flag-img" />
+                  <span className="hm-name">{m.home.name}</span>
+                </div>
+                <div className="hm-score-box">
+                  <div className={`hm-score${m.status === 'live' ? ' live-score' : ''}`}>{m.score ?? 'vs'}</div>
+                  <div className={`hm-time${m.status === 'live' ? ' live-time' : ''}`}>{m.status === 'live' ? m.clock : m.date}</div>
+                </div>
+                <div className="hm-team right">
+                  <TeamFlag code={m.away.flagCode} name={m.away.name} size={18} className="hm-flag-img" />
+                  <span className="hm-name">{m.away.name}</span>
+                </div>
+              </motion.a>
+            ))}
+          </div>
         </div>
       </div>
     </div>

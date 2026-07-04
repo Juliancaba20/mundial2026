@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { TEAMS, TEAMS_BY_SLUG, BASE_MATCHES } from '@/lib/data'
 import { LiveTeamMatches } from '@/components/LiveTeamMatches'
 import { TeamFlag } from '@/components/TeamFlag'
+import { SquadSectionClient } from '@/components/SquadSectionClient'
 import type { Player } from '@/types'
 
 interface Props {
@@ -32,9 +33,9 @@ const GROUP_COLORS: Record<string, string> = {
 }
 
 const POSITION_LABELS: Record<Player['position'], string> = {
-  GK:  'Porteros',
-  DEF: 'Defensas',
-  MID: 'Centrocampistas',
+  GK:  'Arqueros',
+  DEF: 'Defensores',
+  MID: 'Mediocampistas',
   FWD: 'Delanteros',
 }
 
@@ -50,7 +51,38 @@ export default async function EquipoPage({ params }: Props) {
   )
 
   const groupColor = GROUP_COLORS[team.group] ?? 'var(--green)'
-  const squad = team.squad ?? []
+  
+  let squad = team.squad ?? []
+  let coach = team.coach ?? 'Por confirmar'
+  const isPlaceholder = squad.length === 0
+
+  if (isPlaceholder) {
+    coach = 'Por confirmar'
+    squad = [
+      // Arqueros
+      { number: 1, name: 'Por confirmar', position: 'GK', club: '—' },
+      { number: 12, name: 'Por confirmar', position: 'GK', club: '—' },
+      { number: 23, name: 'Por confirmar', position: 'GK', club: '—' },
+      // Defensores
+      { number: 2, name: 'Por confirmar', position: 'DEF', club: '—' },
+      { number: 3, name: 'Por confirmar', position: 'DEF', club: '—' },
+      { number: 4, name: 'Por confirmar', position: 'DEF', club: '—' },
+      { number: 6, name: 'Por confirmar', position: 'DEF', club: '—' },
+      { number: 13, name: 'Por confirmar', position: 'DEF', club: '—' },
+      // Mediocampistas
+      { number: 5, name: 'Por confirmar', position: 'MID', club: '—' },
+      { number: 8, name: 'Por confirmar', position: 'MID', club: '—' },
+      { number: 10, name: 'Por confirmar', position: 'MID', club: '—' },
+      { number: 14, name: 'Por confirmar', position: 'MID', club: '—' },
+      { number: 16, name: 'Por confirmar', position: 'MID', club: '—' },
+      // Delanteros
+      { number: 7, name: 'Por confirmar', position: 'FWD', club: '—' },
+      { number: 9, name: 'Por confirmar', position: 'FWD', club: '—' },
+      { number: 11, name: 'Por confirmar', position: 'FWD', club: '—' },
+      { number: 19, name: 'Por confirmar', position: 'FWD', club: '—' },
+      { number: 21, name: 'Por confirmar', position: 'FWD', club: '—' },
+    ]
+  }
 
   const squadByPosition = POSITION_ORDER.reduce<Record<Player['position'], Player[]>>(
     (acc, pos) => {
@@ -59,8 +91,6 @@ export default async function EquipoPage({ params }: Props) {
     },
     { GK: [], DEF: [], MID: [], FWD: [] }
   )
-
-  const hasSquadSection = squad.length > 0 || !!team.coach
 
   return (
     <>
@@ -102,45 +132,13 @@ export default async function EquipoPage({ params }: Props) {
         <LiveTeamMatches initialMatches={matches} />
 
         {/* PLANTEL + DT */}
-        {hasSquadSection && (
-          <div className="squad-section">
-            <div className="team-section-title">PLANTEL</div>
-
-            {/* DIRECTOR TÉCNICO — card destacada dentro de la sección */}
-            {team.coach && (
-              <div className="squad-coach">
-                <span className="squad-coach-label">Director Técnico</span>
-                <span className="squad-coach-name">{team.coach}</span>
-              </div>
-            )}
-
-            {/* JUGADORES */}
-            {squad.length > 0 && (
-              <div className="squad-grid">
-                {POSITION_ORDER.map(pos => {
-                  const players = squadByPosition[pos]
-                  if (players.length === 0) return null
-                  return (
-                    <div key={pos} className="squad-column">
-                      <div className="squad-pos-label">{POSITION_LABELS[pos]}</div>
-                      {players.map(p => (
-                        <div key={p.number ?? p.name} className="squad-player">
-                          {p.number != null && (
-                            <span className="squad-number">{p.number}</span>
-                          )}
-                          <div className="squad-info">
-                            <span className="squad-name">{p.name}</span>
-                            {p.club && <span className="squad-club">{p.club}</span>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
+        <SquadSectionClient
+          coach={coach}
+          squadByPosition={squadByPosition}
+          positionLabels={POSITION_LABELS}
+          positionOrder={POSITION_ORDER}
+          isPlaceholder={isPlaceholder}
+        />
 
         {/* OTROS EQUIPOS DEL GRUPO */}
         <div style={{ marginTop: 40 }}>

@@ -974,3 +974,33 @@ button { font-family: var(--body); cursor: pointer; }
   .m-stadium { max-width: 150px; }
   .m-group-tag { align-self: flex-start; margin-top: 10px; }
 }
+
+/* ── INFINITE TICKER MARQUEE ─────────────────────────────────────────── */
+.marquee-container {
+  overflow: hidden;
+  width: 100%;
+  display: flex;
+  user-select: none;
+}
+
+.marquee-content {
+  display: flex;
+  width: max-content;
+  flex-shrink: 0;
+  gap: 0;
+  animation: marquee-scroll-ltr 30s linear infinite;
+}
+
+.marquee-container:hover .marquee-content {
+  animation-play-state: paused;
+}
+
+@keyframes marquee-scroll-ltr {
+  0% {
+    transform: translate3d(-50%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
