@@ -43,7 +43,7 @@ function matchTeamName(espnName: string, ourName: string): boolean {
 
 // Mismos status reales que usa lib/espn.ts (confirmados en producción)
 function classify(statusName: string): 'done' | 'live' | 'pending' {
-  if (statusName === 'STATUS_FULL_TIME' || statusName === 'STATUS_FINAL' || statusName === 'STATUS_FULL_PEN') return 'done'
+  if (statusName === 'STATUS_FULL_TIME' || statusName === 'STATUS_FINAL' || statusName === 'STATUS_FULL_PEN' || statusName === 'STATUS_FINAL_PEN') return 'done'
   if (statusName === 'STATUS_IN_PROGRESS' || statusName === 'STATUS_FIRST_HALF' || statusName === 'STATUS_SECOND_HALF' || statusName === 'STATUS_OVERTIME') return 'live'
   return 'pending'
 }
@@ -55,11 +55,18 @@ export async function GET() {
   tomorrow.setDate(tomorrow.getDate() + 1)
   const tomorrowStr = tomorrow.toISOString().slice(0, 10).replace(/-/g, '')
 
+  // Rango completo del torneo (fase de grupos + eliminatorias), igual que
+  // TOURNAMENT_DATES en lib/espn.ts. Antes este endpoint cortaba en el 30 de
+  // junio y por eso no mostraba nada de los cruces de julio (16avos en
+  // adelante), aunque lib/espn.ts sí los consultaba.
   const allDates = [
     '20260611','20260612','20260613','20260614','20260615','20260616',
     '20260617','20260618','20260619','20260620','20260621','20260622',
     '20260623','20260624','20260625','20260626','20260627','20260628',
-    '20260629','20260630',
+    '20260629','20260630','20260701','20260702','20260703','20260704',
+    '20260705','20260706','20260707','20260708','20260709','20260710',
+    '20260711','20260712','20260713','20260714','20260715','20260716',
+    '20260717','20260718','20260719',
   ]
   const dates = allDates.filter(d => d <= tomorrowStr)
 

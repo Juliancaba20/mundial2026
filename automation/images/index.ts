@@ -6,7 +6,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import type { GeneratedArticle } from '../generators/article-generator.ts'
-import { CONFIG } from '../config.ts'
+import { CONFIG, ROOT_DIR } from '../config.ts'
 import { logger } from '../logger/index.ts'
 import { PollinationsProvider } from './pollinations-provider.ts'
 import type { ImageProvider } from './image-interface.ts'
@@ -65,7 +65,7 @@ function buildImagePrompt(article: GeneratedArticle): string {
 export async function generateAndSaveImage(
   article: GeneratedArticle
 ): Promise<boolean> {
-  const outputDir = path.resolve(process.cwd(), CONFIG.publicDir, article.slug)
+  const outputDir = path.resolve(ROOT_DIR, CONFIG.publicDir, article.slug)
   const outputPath = path.join(outputDir, 'cover.webp')
 
   fs.mkdirSync(outputDir, { recursive: true })

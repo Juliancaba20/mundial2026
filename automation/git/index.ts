@@ -3,11 +3,15 @@
 // Solo hace commit si hay cambios. Nunca rompe si no hay nada que commitear.
 
 import { execSync } from 'node:child_process'
-import { CONFIG } from '../config.ts'
+import { CONFIG, ROOT_DIR } from '../config.ts'
 import { logger } from '../logger/index.ts'
 
+// cwd: ROOT_DIR — el workflow corre este script con working-directory:
+// automation, así que sin esto los pathspecs de `git add` (contentDir,
+// publicDir, stateFile, todos relativos a la raíz del repo) apuntaban a
+// `automation/automation/...`, no existían, y el commit fallaba en silencio.
 function git(cmd: string): string {
-  return execSync(`git ${cmd}`, { encoding: 'utf8' }).trim()
+  return execSync(`git ${cmd}`, { encoding: 'utf8', cwd: ROOT_DIR }).trim()
 }
 
 function hasChanges(): boolean {

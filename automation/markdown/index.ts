@@ -6,7 +6,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { GeneratedArticle } from '../generators/article-generator.ts'
 import type { ScoredArticle } from '../ranking/index.ts'
-import { CONFIG } from '../config.ts'
+import { CONFIG, ROOT_DIR } from '../config.ts'
 import { logger } from '../logger/index.ts'
 
 // ─── Metadata de auditoría ────────────────────────────────────────────────────
@@ -73,8 +73,8 @@ export function writeArticle(
 ): void {
   validateFrontmatter(article)
 
-  // Carpeta del artículo
-  const contentDir = path.resolve(process.cwd(), CONFIG.contentDir, article.slug)
+  // Carpeta del artículo — resuelta desde la raíz del proyecto, no desde cwd
+  const contentDir = path.resolve(ROOT_DIR, CONFIG.contentDir, article.slug)
   fs.mkdirSync(contentDir, { recursive: true })
 
   // index.md

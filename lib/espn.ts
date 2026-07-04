@@ -39,7 +39,10 @@ function normalize(str: string): string {
 const DONE_STATUSES = new Set([
   'STATUS_FINAL',
   'STATUS_FULL_TIME',
-  'STATUS_FULL_PEN',      // finalizado en penales
+  'STATUS_FULL_PEN',      // finalizado en penales (alias visto en algunos eventos)
+  'STATUS_FINAL_PEN',     // finalizado en penales — el que ESPN realmente envía en
+                          // eliminatorias (confirmado en producción vía /api/debug,
+                          // ej. Alemania-Paraguay y Países Bajos-Marruecos, 29 jun)
   'STATUS_HALFTIME',      // descanso (score parcial disponible)
   'STATUS_OVERTIME',      // prórroga
   'STATUS_SECOND_HALF',   // segundo tiempo
@@ -204,7 +207,8 @@ export async function fetchLiveResults(): Promise<FetchResultsOutput> {
       const actuallyDone = statusName === 'STATUS_FULL_TIME' ||
                            statusName === 'STATUS_FINAL' ||
                            statusName === 'STATUS_FULL_PEN' ||
-                           statusName === 'STATUS_FULL_PENALTY' // alias visto en algunos eventos de eliminatorias
+                           statusName === 'STATUS_FULL_PENALTY' || // alias visto en algunos eventos de eliminatorias
+                           statusName === 'STATUS_FINAL_PEN' // finalizado en penales — status real de ESPN en eliminatorias (bug: faltaba, dejaba results de penales sin propagar)
       const actuallyLive = statusName === 'STATUS_IN_PROGRESS' ||
                            statusName === 'STATUS_FIRST_HALF' ||
                            statusName === 'STATUS_SECOND_HALF' ||

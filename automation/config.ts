@@ -3,6 +3,28 @@
 // Modificar solo este archivo para cambiar el comportamiento del sistema.
 // No hay valores hardcodeados en ningún otro módulo.
 
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+// ─── Raíz del proyecto (bug histórico) ────────────────────────────────────────
+// El workflow de GitHub Actions ejecuta `npx tsx scheduler.ts` con
+// `working-directory: automation` (ver .github/workflows/auto-news.yml). Eso
+// significa que `process.cwd()` durante la ejecución real es la carpeta
+// `automation/`, NO la raíz del repo. Como contentDir/publicDir/stateFile más
+// abajo están escritos "relativos a la raíz del proyecto", cualquier código
+// que los resolviera con `path.resolve(process.cwd(), CONFIG.xxx)` terminaba
+// escribiendo un nivel de más adentro (ej. `automation/content/noticias/...`
+// en vez de `content/noticias/...`), y el commit fallaba porque el pathspec
+// de `stateFile` tampoco existía en esa ubicación. Por eso las noticias se
+// generaban pero nunca se veían en la web ni se publicaban en git.
+//
+// ROOT_DIR se calcula a partir de la ubicación de ESTE archivo (no del cwd),
+// así siempre apunta a la raíz real del proyecto sin importar desde dónde se
+// invoque el script.
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+export const ROOT_DIR = path.resolve(__dirname, '..')
+
 export const CONFIG = {
   // ─── Proyecto ──────────────────────────────────────────────────────────────
   topic: 'Mundial 2026',

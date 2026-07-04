@@ -3,7 +3,7 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import { CONFIG } from '../config.ts'
+import { CONFIG, ROOT_DIR } from '../config.ts'
 
 interface PublishedState {
   slugs: string[]
@@ -11,7 +11,7 @@ interface PublishedState {
 }
 
 function getStatePath(): string {
-  return path.resolve(process.cwd(), CONFIG.stateFile)
+  return path.resolve(ROOT_DIR, CONFIG.stateFile)
 }
 
 export function loadState(): PublishedState {
@@ -37,7 +37,7 @@ export function isPublished(slug: string): boolean {
   // Capa 1: registro persistente
   if (state.slugs.includes(slug)) return true
   // Capa 2: carpeta en disco
-  const dir = path.resolve(process.cwd(), CONFIG.contentDir, slug)
+  const dir = path.resolve(ROOT_DIR, CONFIG.contentDir, slug)
   return fs.existsSync(dir)
 }
 

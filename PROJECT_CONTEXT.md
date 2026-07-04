@@ -66,6 +66,18 @@ types/
   index.ts              — Todos los tipos TypeScript del proyecto
 
 NOTICIAS.md             — Guía de autoría de noticias (paso a paso)
+
+automation/              — Pipeline de auto-publicación de noticias (GitHub Actions, cron diario)
+  config.ts              — Config central + ROOT_DIR (raíz real del repo, ver sección "Sistema de noticias automatizado")
+  scheduler.ts            — Orquestador: fetch RSS → ranking → generación LLM → imagen → markdown → git push
+  fetch/                 — Lectura de feeds RSS (FIFA, ESPN, Marca, AS, BBC Sport)
+  ranking/                — Scoring de artículos candidatos
+  generators/             — Generación de artículo vía Groq (Llama 3.3 70B)
+  images/                 — Generación de cover.webp vía Pollinations.ai
+  markdown/               — Escritura de content/noticias/<slug>/index.md
+  git/                    — git add/commit/push automático
+  state/                  — Registro de qué ya se publicó (dedupe)
+  .github/workflows/auto-news.yml — cron diario 11:00 UTC (08:00 Argentina), working-directory: automation
 ```
 
 ---
@@ -135,6 +147,18 @@ export function applyResults(matches: Match[], results: LiveResultsMap): Match[]
 2. Verificar que `matched` contenga partidos con score real
 3. Si `unmatched` tiene partidos inesperados → revisar ESPN_ALIASES
 4. Si no hay datos → verificar que las fechas en TOURNAMENT_DATES cubren el partido buscado
+
+**Importante — `/api/debug` solo testea el matching de fase de grupos (BASE_MATCHES,
+pares fijos home/away). En eliminatorias NO hay par fijo — el matching real ocurre
+por equipo individual vía `findOwnTeamBySlug()` dentro de `fetchLiveResults()`.
+Por eso, durante eliminatorias, `/api/debug` va a marcar `NO_MATCH` en CASI TODOS
+los partidos de knockout — eso es esperado y NO significa que el resultado en vivo
+esté roto. Para diagnosticar eliminatorias hay que mirar los logs de `[ESPN]` en
+Vercel (bucados por `knockoutMatched`), no la sección `matchResult` de `/api/debug`.**
+
+`/api/debug` consulta el mismo rango de fechas que `TOURNAMENT_DATES` en `lib/espn.ts`
+(11 jun – 19 jul). Si alguna vez se corta antes de tiempo, revisar que el array
+`allDates` en `app/api/debug/route.ts` siga sincronizado con `TOURNAMENT_DATES`.
 
 ---
 
@@ -241,6 +265,112 @@ KnockoutResultsMap = Record<string, { opponent: string; homeScore: number; awayS
 
 ---
 
+## Sistema de noticias automatizado (`automation/`)
+
+### Objetivo
+Publicar noticias en `content/noticias/` automáticamente, sin intervención manual, vía un
+cron diario de GitHub Actions. Stack 100% gratuito: RSS (fuentes) → Groq (redacción) →
+Pollinations.ai (imagen de portada) → commit + push a `main` → Vercel redeploya solo.
+
+### Flujo (`scheduler.ts`)
+```
+GitHub Actions cron (11:00 UTC / 08:00 Argentina, .github/workflows/auto-news.yml)
+  ↓ (working-directory: automation)
+scheduler.ts
+  ↓
+fetch/        — lee los 5 feeds RSS (FIFA, ESPN, Marca, AS, BBC Sport)
+  ↓
+ranking/      — score de cada artículo candidato (weight de la fuente + señales)
+  ↓
+state/        — descarta candidatos ya publicados (published.json + carpeta en disco)
+  ↓
+generators/   — Groq (Llama 3.3 70B) redacta el artículo en español, anti-alucinación
+  ↓
+images/       — Pollinations.ai genera cover.webp (fallback a emoji si falla)
+  ↓
+markdown/     — escribe content/noticias/<slug>/index.md + metadata.json
+  ↓
+git/          — git add + commit + push a main
+  ↓
+Vercel detecta el push → redeploy automático → noticia visible en /noticias
+```
+
+### ⚠️ Bug crítico ya resuelto — resolución de rutas por `process.cwd()` (4 jul 2026)
+
+**Síntoma reportado:** "las noticias se crean pero no en la ubicación donde deberían estar,
+lo que hace que nunca se vean en la web" y "las noticias automáticas no se están publicando".
+
+**Causa raíz:** `.github/workflows/auto-news.yml` corre `npx tsx scheduler.ts` con
+`working-directory: automation`. Eso significa que durante la ejecución real,
+`process.cwd()` es la carpeta `automation/`, **no la raíz del repo**. Pero
+`CONFIG.contentDir`, `CONFIG.publicDir` y `CONFIG.stateFile` en `automation/config.ts` están
+escritos como rutas **relativas a la raíz del proyecto** (`content/noticias`,
+`public/noticias`, `automation/state/published.json`).
+
+Los módulos que resolvían esas rutas con `path.resolve(process.cwd(), CONFIG.xxx)`
+(`markdown/index.ts`, `images/index.ts`, `state/index.ts`) terminaban escribiendo un nivel
+de más adentro: `automation/content/noticias/<slug>/` en vez de `content/noticias/<slug>/`
+(que es lo único que lee `lib/noticias.ts` en build time). El estado de publicados también
+se escribía en `automation/automation/state/published.json` (doble `automation/`).
+
+Además, `git/index.ts` corría `git add content/noticias/ public/noticias/
+automation/state/published.json` con cwd = `automation/`, así que el pathspec del
+`stateFile` apuntaba a una ruta inexistente (`automation/automation/state/published.json`).
+`git add` fallaba, `execSync` tiraba una excepción, el `catch` de `commitAndPush()` la
+atrapaba y solo logueaba el error — **nunca se hacía commit ni push**, aunque el artículo sí
+se había generado (en la carpeta equivocada).
+
+Evidencia encontrada en el proyecto: 3 artículos reales generados el 27 jun 2026
+(`espana-juega-prime-time`, `empate-entre-egipto-y-iran`, `uruguay-eliminado-mundial`)
+atrapados en `automation/content/noticias/` y `automation/public/noticias/`, con su estado
+en `automation/automation/state/published.json` — nunca llegaron a `content/noticias/` ni se
+commitearon.
+
+**Solución aplicada:**
+1. `automation/config.ts` ahora exporta `ROOT_DIR`, calculado desde la ubicación del propio
+   archivo (`fileURLToPath(import.meta.url)` + `path.resolve(__dirname, '..')`) — **no**
+   desde `process.cwd()`. Así siempre apunta a la raíz real del repo sin importar desde qué
+   carpeta se invoque el script.
+2. `markdown/index.ts`, `images/index.ts` y `state/index.ts` ahora resuelven
+   `contentDir`/`publicDir`/`stateFile` con `path.resolve(ROOT_DIR, CONFIG.xxx, ...)` en vez
+   de `process.cwd()`.
+3. `git/index.ts` ahora ejecuta todos los comandos git con `{ cwd: ROOT_DIR }`, así los
+   pathspecs de `git add` coinciden con rutas reales del working tree.
+4. Los 3 artículos huérfanos se migraron a `content/noticias/` y `public/noticias/`, y
+   `automation/state/published.json` (ruta correcta) se actualizó con sus slugs.
+5. Se eliminaron los directorios espurios `automation/content/`, `automation/public/` y
+   `automation/automation/`.
+
+**Regla para el futuro:** cualquier módulo nuevo bajo `automation/` que necesite leer o
+escribir algo en el repo (fuera de la carpeta `automation/` misma) **debe** importar
+`ROOT_DIR` desde `automation/config.ts` y resolver la ruta con `path.resolve(ROOT_DIR, ...)`.
+Nunca usar `process.cwd()` directamente — el working directory real en producción (GitHub
+Actions) es `automation/`, no la raíz del repo.
+
+### Cómo diagnosticar si el automation dejó de publicar
+1. Ver la pestaña **Actions** del repo en GitHub → el run diario de "Auto-publicar noticias
+   Mundial 2026" → revisar si terminó en verde y leer los logs de `scheduler.ts`.
+2. Si terminó en verde pero no hay commit nuevo en `main` → sospechar que `git/index.ts`
+   falló en silencio (revisar que sigue corriendo con `cwd: ROOT_DIR`).
+3. Si hay commit pero la noticia no aparece en `/noticias` → verificar que el `index.md`
+   quedó en `content/noticias/<slug>/` (raíz del repo), no en `automation/content/noticias/`.
+4. `automation/state/published.json` (raíz del repo, no `automation/automation/...`) debe
+   contener el slug de cada noticia ya publicada.
+
+### Archivos del pipeline
+- `automation/config.ts` — config central + `ROOT_DIR` (ver bug arriba)
+- `automation/scheduler.ts` — orquestador principal
+- `automation/fetch/` — lectura RSS
+- `automation/ranking/` — scoring de candidatos
+- `automation/generators/` — generación de artículo (Groq)
+- `automation/images/` — generación de cover.webp (Pollinations.ai)
+- `automation/markdown/` — escritura de index.md + metadata.json
+- `automation/git/` — commit + push
+- `automation/state/` — dedupe (published.json + chequeo de disco)
+- `.github/workflows/auto-news.yml` — cron + `working-directory: automation`
+
+---
+
 ## Flujo de resultados en vivo
 
 ### Componentes que consumen resultados
@@ -282,6 +412,36 @@ KnockoutResultsMap = Record<string, { opponent: string; homeScore: number; awayS
 
 **6. Uzbekistán reemplaza Eslovenia en Grupo K**
 - **Solución aplicada:** Datos corregidos en `lib/data.ts`. ESPN_ALIASES incluye `uzbekistan`.
+
+**7. STATUS_FINAL_PEN no reconocido como partido terminado (4 jul 2026)**
+- **Problema:** Partidos de eliminatorias decididos por penales (ej. Alemania vs Paraguay,
+  Países Bajos vs Marruecos, 29 jun) nunca se marcaban como terminados: el resultado no
+  llegaba en vivo y el ganador nunca se propagaba a la ronda siguiente del bracket. Esto se
+  reportaba como "resultados en vivo no llegan" y "cruces del bracket mal armados" — pero el
+  diseño de los cruces (Anexo C, emparejamientos R32) era correcto; el bug era puramente de
+  reconocimiento de status.
+- **Causa:** `actuallyDone` en `fetchLiveResults()` (y `classify()` en `/api/debug`) solo
+  reconocía `STATUS_FULL_TIME`, `STATUS_FINAL`, `STATUS_FULL_PEN` y `STATUS_FULL_PENALTY`.
+  ESPN, para este torneo, envía `STATUS_FINAL_PEN` (no `STATUS_FULL_PEN`) cuando un partido de
+  eliminatoria se define por penales — confirmado en producción vía `/api/debug` el 4 jul 2026.
+- **Solución:** Se agregó `'STATUS_FINAL_PEN'` a `DONE_STATUSES` y al chequeo `actuallyDone`
+  en `lib/espn.ts`, y al `classify()` de `app/api/debug/route.ts`. Si en el futuro aparece
+  otro status de penales no listado, agregarlo en ambos lugares (deben mantenerse
+  sincronizados).
+- **Verificación oficial:** Se contrastaron manualmente los cruces R32 de `lib/bracket.ts`
+  contra resultados reales de ESPN y fuentes oficiales (CBS Sports, FOX Sports, Wikipedia) el
+  4 jul 2026 — los 16 emparejamientos coinciden exactamente con el bracket oficial FIFA. **No
+  tocar los emparejamientos de `lib/bracket.ts` para "arreglar" el bracket** — si algo se ve
+  mal armado, sospechar primero de un status de ESPN no reconocido, no del diseño de cruces.
+
+**8. `/api/debug` con rango de fechas desactualizado**
+- **Problema:** El endpoint de diagnóstico solo consultaba fechas hasta el 30 de junio, por lo
+  que nunca mostraba nada de julio (16avos en adelante) aunque `lib/espn.ts` sí las consultaba
+  correctamente. Esto hacía parecer que ESPN "no tenía datos" de eliminatorias cuando en
+  realidad el debug tool simplemente no las pedía.
+- **Solución:** `allDates` en `app/api/debug/route.ts` ahora cubre el mismo rango que
+  `TOURNAMENT_DATES` en `lib/espn.ts` (11 jun – 19 jul). Si se agrega/cambia una fecha en uno,
+  replicar en el otro.
 
 ### Cómo diagnosticar rápidamente
 1. Abrir `/api/debug` en producción
@@ -343,12 +503,14 @@ npx tsc --noEmit
 npm run build
 
 # 3. En producción, verificar:
-# - /api/debug → revisar matched/unmatched
+# - /api/debug → revisar matched/unmatched (grupos) y statusesSeenInESPN
 # - /grupos → todas las tablas cargan con colores correctos
 # - /grupo/a → LiveGroupStandings hace polling y muestra resultados
-# - /eliminatorias → bracket se renderiza correctamente
+# - /eliminatorias → bracket se renderiza correctamente y propaga ganadores
 # - /partidos → fechas agrupadas correctamente en timezone local
 # - Homepage → countdown muestra la fase correcta del torneo
+# - /noticias → las últimas noticias generadas por el automation aparecen
+# - GitHub Actions → el run de "Auto-publicar noticias" más reciente terminó en verde
 ```
 
 ---
@@ -364,6 +526,9 @@ npm run build
 | `lib/bracket.ts` | Lógica de cruces oficial. Los emparejamientos R32 son exactos según FIFA |
 | `types/index.ts` | Cambios aquí requieren actualizar todos los consumidores |
 | `app/globals.css` | Todo el CSS en un archivo. Cambios de nombres de clase rompen componentes |
+| `automation/config.ts` | Define `ROOT_DIR`. Si se rompe, todo el pipeline de noticias escribe/commitea en la carpeta equivocada (ver bug histórico #7 en "Sistema de noticias automatizado") |
+| `automation/git/index.ts` | Comandos git deben correr con `cwd: ROOT_DIR`, nunca con el cwd por defecto |
+| `.github/workflows/auto-news.yml` | Define `working-directory: automation` — cualquier ruta nueva en `automation/` debe resolverse vía `ROOT_DIR`, no `process.cwd()` |
 
 ---
 
@@ -383,6 +548,10 @@ npm run build
 
 7. **overflow: hidden puede ocultar contenido visual:** Antes de reportar "no se ve X", verificar que no hay un contenedor con overflow hidden cortando el contenido.
 
+8. **Nunca usar `process.cwd()` dentro de `automation/`:** El workflow de GitHub Actions corre los scripts con `working-directory: automation`, así que `process.cwd()` NO es la raíz del repo ahí dentro. Siempre resolver rutas con `ROOT_DIR` (exportado desde `automation/config.ts`). Este bug hizo que 3 noticias reales se generaran pero nunca se publicaran (ver sección "Sistema de noticias automatizado").
+
+9. **Un bracket que "se ve mal armado" no siempre es un bug de diseño:** Antes de tocar `lib/bracket.ts` o `lib/thirdPlaceTable.ts`, verificar primero si el problema es que ESPN envió un `status` no reconocido (ej. `STATUS_FINAL_PEN`) y por eso un resultado no se propagó. Contrastar los cruces contra fuentes oficiales (FIFA.com, Wikipedia, CBS/FOX Sports) antes de asumir que el emparejamiento en sí está mal.
+
 ---
 
 ## Guía para futuros agentes
@@ -392,21 +561,24 @@ npm run build
 **1. Leer este archivo completo.**
 
 **2. Verificar el estado actual del torneo:**
-- Abrir `/api/debug` para ver qué datos llegan de ESPN
+- Abrir `/api/debug` para ver qué datos llegan de ESPN (recordar: solo testea grupos, no eliminatorias — ver "Cómo verificar que ESPN funciona")
 - Ver `/grupos` para confirmar que las tablas cargan
 - Ver `/eliminatorias` para confirmar que el bracket está bien
+- Ver la pestaña Actions de GitHub para confirmar que el automation de noticias sigue corriendo en verde
 
 **3. Identificar exactamente qué archivos tocar:**
 - Cambio visual/CSS → solo `app/globals.css` y el componente afectado
 - Nuevo resultado → verificar `ESPN_ALIASES` en `lib/espn.ts`
 - Nuevo equipo o partido → solo `lib/data.ts`
 - Cambio en lógica de clasificación → `lib/standings.ts` (con mucho cuidado)
-- Cambio en bracket → `lib/bracket.ts` (entender primero el Reglamento FIFA)
+- Cambio en bracket → `lib/bracket.ts` (entender primero el Reglamento FIFA, y descartar antes un status de ESPN no reconocido)
+- Cambio en el pipeline de noticias → cualquier ruta nueva debe resolverse con `ROOT_DIR` desde `automation/config.ts`, nunca `process.cwd()`
 
 **4. Nunca tocar sin necesidad:**
 - `lib/thirdPlaceTable.ts`
 - Los slugs existentes en `lib/data.ts`
 - La lógica de normalización en `lib/espn.ts`
+- `automation/config.ts` (`ROOT_DIR`) sin entender el bug histórico que resolvió
 
 **5. Siempre validar:**
 ```bash
@@ -427,6 +599,6 @@ npx tsc --noEmit && npm run build
 
 ---
 
-*Última actualización: junio 2026 (sección de noticias migrada a Markdown)*
+*Última actualización: 4 jul 2026 (fix STATUS_FINAL_PEN en eliminatorias, fix rutas del automation de noticias con ROOT_DIR, sección de automation agregada)*
 *Repo: https://github.com/Juliancaba20/mundial2026*
 *Producción: https://mundial2026-blond-pi.vercel.app*
