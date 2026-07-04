@@ -1,7 +1,10 @@
+'use client'
+
 import Link from 'next/link'
 import type { TeamStanding } from '@/lib/standings'
 import { formatDG } from '@/lib/standings'
 import { TeamFlag } from './TeamFlag'
+import { motion } from 'motion/react'
 
 interface Props {
   standings: TeamStanding[]
@@ -34,13 +37,38 @@ function getRowClass(
   return 'st-row st-pos-third'                             // amarillo (pendiente)
 }
 
+const tableContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+} as const
+
+const rowVariants = {
+  hidden: { opacity: 0, x: -6 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { type: 'spring', stiffness: 350, damping: 25 },
+  },
+} as const
+
 export function StandingsTable({ standings, compact = false, qualifiedThirdSlugs, thirdsResolved }: Props) {
   if (standings.length === 0) return null
 
   const anyPlayed = standings.some(s => s.pj > 0)
 
   return (
-    <div className="standings-wrap">
+    <motion.div
+      className="standings-wrap"
+      variants={tableContainerVariants}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: '-20px' }}
+    >
       <table className="standings-table">
         <thead>
           <tr>
@@ -58,8 +86,10 @@ export function StandingsTable({ standings, compact = false, qualifiedThirdSlugs
         </thead>
         <tbody>
           {standings.map((row, i) => (
-            <tr
+            <motion.tr
               key={row.team.slug}
+              variants={rowVariants}
+              whileHover={{ scale: 1.01, backgroundColor: 'rgba(255, 255, 255, 0.04)' }}
               className={getRowClass(i, row.team.slug, anyPlayed, qualifiedThirdSlugs, thirdsResolved)}
             >
               <td className="st-pos">
@@ -79,18 +109,25 @@ export function StandingsTable({ standings, compact = false, qualifiedThirdSlugs
               {!compact && <td className="st-num st-hide-sm">{row.gc}</td>}
               <td className="st-num">{anyPlayed ? formatDG(row.dg) : '—'}</td>
               <td className="st-num st-pts">{row.pts}</td>
-            </tr>
+            </motion.tr>
           ))}
         </tbody>
       </table>
 
       {anyPlayed && (
-        <div className="st-legend">
+        <motion.div
+          className="st-legend"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.2 }}
+        >
           <span className="st-legend-dot st-legend-green" /> Clasifica
           <span className="st-legend-dot st-legend-yellow" style={{ marginLeft: 10 }} /> 3° (pendiente)
           <span className="st-legend-dot st-legend-red" style={{ marginLeft: 10 }} /> Eliminado
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   )
 }
+
