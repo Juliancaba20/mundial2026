@@ -43,7 +43,7 @@ function matchTeamName(espnName: string, ourName: string): boolean {
 
 // Mismos status reales que usa lib/espn.ts (confirmados en producción)
 function classify(statusName: string): 'done' | 'live' | 'pending' {
-  if (statusName === 'STATUS_FULL_TIME' || statusName === 'STATUS_FINAL' || statusName === 'STATUS_FULL_PEN' || statusName === 'STATUS_FINAL_PEN') return 'done'
+  if (statusName === 'STATUS_FULL_TIME' || statusName === 'STATUS_FINAL' || statusName === 'STATUS_FULL_PEN' || statusName === 'STATUS_FINAL_PEN' || statusName === 'STATUS_FINAL_AET') return 'done'
   if (statusName === 'STATUS_IN_PROGRESS' || statusName === 'STATUS_FIRST_HALF' || statusName === 'STATUS_SECOND_HALF' || statusName === 'STATUS_OVERTIME') return 'live'
   return 'pending'
 }

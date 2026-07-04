@@ -219,13 +219,46 @@ export function getBestThirds(matches: Match[]): Array<{ group: string; team: Te
 
 ### Estructura de rondas
 ```
-R32 (16avos)  → partidos 73–88  — Anexo C para terceros
-R16 (8avos)   → partidos 89–96
-QF  (cuartos) → partidos 97–100
-SF  (semis)   → partidos 101–102
-F   (final)   → partido 103
-3P  (3er puesto) → partido 104
+R32 (16avos)     → partidos 73–88  — Anexo C para terceros
+R16 (8avos)      → partidos 89–96
+QF  (cuartos)    → partidos 97–100
+SF  (semis)      → partidos 101–102
+3P  (3er puesto) → partido 103 (18 jul)
+F   (final)      → partido 104 (19 jul)
 ```
+
+### Tabla de referencia oficial del cuadro completo (verificada 4 jul 2026)
+**No re-derivar esto a mano si hay que tocar `lib/bracket.ts` — copiar de acá.** Fuente:
+numeración oficial de partidos (Yahoo Sports / FIFA), contrastada partido por partido contra
+resultados reales de ESPN.
+
+| R32 (id interno) | Cruce | Alimenta a | R16 (id interno) | Alimenta a | QF (id interno) | Alimenta a |
+|---|---|---|---|---|---|---|
+| R32-1 | 2°A vs 2°B | R16-1 home | R16-1 = M90 (Canadá/Marruecos) | QF-1 home | QF-1 = M97 | SF-1 home |
+| R32-3 | 1°F vs 2°C | R16-1 away | | | | |
+| R32-2 | 1°E vs 3° | R16-2 home | R16-2 = M89 (Paraguay/Francia) | QF-1 away | | |
+| R32-5 | 1°I vs 3° | R16-2 away | | | | |
+| R32-4 | 1°C vs 2°F | R16-3 home | R16-3 = M91 (Brasil/Noruega) | QF-3 home | QF-3 = M99 | SF-2 home |
+| R32-6 | 2°E vs 2°I | R16-3 away | | | | |
+| R32-7 | 1°A vs 3° | R16-4 home | R16-4 = M92 (México/Inglaterra) | QF-3 away | | |
+| R32-8 | 1°L vs 3° | R16-4 away | | | | |
+| R32-12 | 1°H vs 2°J | R16-5 home | R16-5 = M93 (España/Portugal) | QF-2 home | QF-2 = M98 | SF-1 away |
+| R32-11 | 2°K vs 2°L | R16-5 away | | | | |
+| R32-10 | 1°G vs 3° | R16-6 home | R16-6 = M94 (Bélgica/EE.UU.) | QF-2 away | | |
+| R32-9 | 1°D vs 3° | R16-6 away | | | | |
+| R32-16 | 2°D vs 2°G | R16-7 home | R16-7 = M95 (Egipto/Argentina) | QF-4 home | QF-4 = M100 | SF-2 away |
+| R32-14 | 1°J vs 2°H | R16-7 away | | | | |
+| R32-13 | 1°B vs 3° | R16-8 home | R16-8 = M96 (Suiza/Colombia) | QF-4 away | | |
+| R32-15 | 1°K vs 3° | R16-8 away | | | | |
+
+SF-1 (QF-1 home + QF-2 away) → Final home, 3RD home (si pierde)
+SF-2 (QF-3 home + QF-4 away) → Final away, 3RD away (si pierde)
+
+Este cruce R16→QF tuvo un bug real (corregido el 4 jul 2026, ver "Errores históricos" #10):
+antes de la corrección, los R32 se agrupaban en pares consecutivos (R32-1+R32-2,
+R32-3+R32-4, ...), lo cual NO refleja el cuadro real — el orden correcto es el de la tabla de
+arriba. Si en el futuro un cruce se ve raro, comparar primero contra esta tabla antes de
+volver a buscar fuentes oficiales desde cero.
 
 ### buildBracket()
 ```typescript
@@ -430,9 +463,10 @@ Actions) es `automation/`, no la raíz del repo.
   sincronizados).
 - **Verificación oficial:** Se contrastaron manualmente los cruces R32 de `lib/bracket.ts`
   contra resultados reales de ESPN y fuentes oficiales (CBS Sports, FOX Sports, Wikipedia) el
-  4 jul 2026 — los 16 emparejamientos coinciden exactamente con el bracket oficial FIFA. **No
-  tocar los emparejamientos de `lib/bracket.ts` para "arreglar" el bracket** — si algo se ve
-  mal armado, sospechar primero de un status de ESPN no reconocido, no del diseño de cruces.
+  4 jul 2026 — los 16 emparejamientos R32 (qué grupo enfrenta a qué grupo) coinciden
+  exactamente con el bracket oficial FIFA. **Esto NO significa que todo el archivo estuviera
+  bien** — ver bug #10 más abajo: el cruce R16→QF sí tenía un error real de diseño, separado
+  de este.
 
 **8. `/api/debug` con rango de fechas desactualizado**
 - **Problema:** El endpoint de diagnóstico solo consultaba fechas hasta el 30 de junio, por lo
@@ -442,6 +476,61 @@ Actions) es `automation/`, no la raíz del repo.
 - **Solución:** `allDates` en `app/api/debug/route.ts` ahora cubre el mismo rango que
   `TOURNAMENT_DATES` en `lib/espn.ts` (11 jun – 19 jul). Si se agrega/cambia una fecha en uno,
   replicar en el otro.
+
+**9. `STATUS_FINAL_AET` no reconocido (4 jul 2026)**
+- **Problema:** Partidos de eliminatorias decididos en tiempo suplementario SIN penales (ej.
+  Bélgica 3-2 Senegal, Argentina 3-2 Cabo Verde, 1-3 jul) usan el status `STATUS_FINAL_AET`,
+  que tampoco estaba reconocido como "terminado". Mismo síntoma que el bug #7 (resultado no
+  llega, ganador no propaga).
+- **Solución:** Se agregó `'STATUS_FINAL_AET'` a `DONE_STATUSES`/`actuallyDone` en
+  `lib/espn.ts` y a `classify()` en `app/api/debug/route.ts`, junto a `STATUS_FINAL_PEN`.
+- **Regla:** cualquier status nuevo de ESPN no reconocido (visto en `statusesSeenInESPN` de
+  `/api/debug`) que corresponda a un partido ya terminado debe agregarse en AMBOS lugares
+  (`lib/espn.ts` y `app/api/debug/route.ts`) — se desincronizan fácil si se toca solo uno.
+
+**10. Cruce R16→QF mal armado (4 jul 2026) — bug real de diseño, no solo de status**
+- **Problema:** A diferencia de los bugs #7/#9 (que eran de reconocimiento de status), este
+  SÍ era un error real en `lib/bracket.ts`: el `nextMatchId`/`nextPosition` de varios partidos
+  de R32 apuntaba a la ronda de Octavos (R16) equivocada, y dos de los emparejamientos
+  Octavos→Cuartos estaban invertidos. Ejemplo concreto reportado: la web mostraba "Paraguay
+  vs. Canadá" en octavos, cuando el cruce real (confirmado oficialmente) es Paraguay vs.
+  Francia.
+- **Causa:** el código agrupaba los R32 en pares consecutivos (R32-1+R32-2, R32-3+R32-4, etc.)
+  asumiendo que el orden de creación reflejaba el cuadro real. No es así: el cuadro oficial
+  FIFA cruza los R32 en un orden específico que no es simplemente "consecutivo".
+- **Verificación:** se contrastó 1 a 1 contra la numeración oficial de partidos de FIFA/Yahoo
+  Sports (partidos 89 a 104) el 4 jul 2026, confirmando cada octavo, cuarto, semifinal, final
+  y partido por el tercer puesto real jugado hasta esa fecha.
+- **Solución:** se reescribió el `nextMatchId`/`nextPosition` de los 16 partidos de R32 y de
+  los 8 de R16 en `lib/bracket.ts` para que coincidan exactamente con la tabla de abajo. Los
+  Cuartos (QF), Semis (SF), Final y 3er puesto ya estaban bien armados (solo R32→R16 y el
+  intercambio QF-2↔QF-3 estaban mal).
+- **Tabla de referencia oficial del cuadro completo (no volver a re-derivar esto a mano —
+  copiar de acá):**
+
+| R32 (id interno) | Partido oficial (M#) | Alimenta a R16 | R16 (id interno) | Alimenta a QF | QF (id interno) | Alimenta a SF |
+|---|---|---|---|---|---|---|
+| R32-1 (2°A/2°B) | M73 | R16-1 home | R16-1 = M90 (Canadá/Marruecos) | QF-1 home | QF-1 = M97 | SF-1 home |
+| R32-3 (1°F/2°C) | M75 | R16-1 away | | | | |
+| R32-2 (1°E/3°) | M74 | R16-2 home | R16-2 = M89 (Paraguay/Francia) | QF-1 away | | |
+| R32-5 (1°I/3°) | M77 | R16-2 away | | | | |
+| R32-4 (1°C/2°F) | M76 | R16-3 home | R16-3 = M91 (Brasil/Noruega) | QF-3 home | QF-3 = M99 | SF-2 home |
+| R32-6 (2°E/2°I) | M78 | R16-3 away | | | | |
+| R32-7 (1°A/3°) | M79 | R16-4 home | R16-4 = M92 (México/Inglaterra) | QF-3 away | | |
+| R32-8 (1°L/3°) | M80 | R16-4 away | | | | |
+| R32-12 (1°H/2°J) | M84 | R16-5 home | R16-5 = M93 (España/Portugal) | QF-2 home | QF-2 = M98 | SF-1 away |
+| R32-11 (2°K/2°L) | M83 | R16-5 away | | | | |
+| R32-10 (1°G/3°) | M82 | R16-6 home | R16-6 = M94 (Bélgica/EE.UU.) | QF-2 away | | |
+| R32-9 (1°D/3°) | M81 | R16-6 away | | | | |
+| R32-16 (2°D/2°G) | M88 | R16-7 home | R16-7 = M95 (Egipto/Argentina) | QF-4 home | QF-4 = M100 | SF-2 away |
+| R32-14 (1°J/2°H) | M86 | R16-7 away | | | | |
+| R32-13 (1°B/3°) | M85 | R16-8 home | R16-8 = M96 (Suiza/Colombia) | QF-4 away | | |
+| R32-15 (1°K/3°) | M87 | R16-8 away | | | | |
+
+  Semis y final ya estaban bien armados: **SF-1** (QF-1 home + QF-2 away) = M101 (14 jul),
+  **SF-2** (QF-3 home + QF-4 away) = M102 (15 jul), **3RD** = perdedores SF-1/SF-2 (18 jul),
+  **F** = ganadores SF-1/SF-2 (19 jul). No tocar esa parte — solo R32→R16 y QF-2↔QF-3 estaban
+  invertidos.
 
 ### Cómo diagnosticar rápidamente
 1. Abrir `/api/debug` en producción
@@ -550,7 +639,7 @@ npm run build
 
 8. **Nunca usar `process.cwd()` dentro de `automation/`:** El workflow de GitHub Actions corre los scripts con `working-directory: automation`, así que `process.cwd()` NO es la raíz del repo ahí dentro. Siempre resolver rutas con `ROOT_DIR` (exportado desde `automation/config.ts`). Este bug hizo que 3 noticias reales se generaran pero nunca se publicaran (ver sección "Sistema de noticias automatizado").
 
-9. **Un bracket que "se ve mal armado" no siempre es un bug de diseño:** Antes de tocar `lib/bracket.ts` o `lib/thirdPlaceTable.ts`, verificar primero si el problema es que ESPN envió un `status` no reconocido (ej. `STATUS_FINAL_PEN`) y por eso un resultado no se propagó. Contrastar los cruces contra fuentes oficiales (FIFA.com, Wikipedia, CBS/FOX Sports) antes de asumir que el emparejamiento en sí está mal.
+9. **Un bracket que "se ve mal armado" puede ser dos cosas distintas — chequear ambas:** (a) un `status` de ESPN no reconocido que impide que un resultado ya jugado se propague (bugs #7, #9), o (b) un error real de `nextMatchId`/`nextPosition` en `lib/bracket.ts` que cruza rondas incorrectamente (bug #10, real, ya corregido el 4 jul 2026). Antes de tocar `lib/bracket.ts`, contrastar el cuadro contra una fuente oficial numerada (FIFA.com, o la numeración de partidos 73-104 de Yahoo/CBS/FOX Sports) — no asumir que los R32 se emparejan en orden consecutivo hacia R16. La tabla de referencia completa está en la sección "Bracket FIFA" más abajo.
 
 ---
 
@@ -599,6 +688,6 @@ npx tsc --noEmit && npm run build
 
 ---
 
-*Última actualización: 4 jul 2026 (fix STATUS_FINAL_PEN en eliminatorias, fix rutas del automation de noticias con ROOT_DIR, sección de automation agregada)*
+*Última actualización: 4 jul 2026 (fix STATUS_FINAL_PEN/STATUS_FINAL_AET en eliminatorias, fix rutas del automation de noticias con ROOT_DIR, fix cruce R16→QF del bracket, tabla de referencia oficial del cuadro agregada)*
 *Repo: https://github.com/Juliancaba20/mundial2026*
 *Producción: https://mundial2026-blond-pi.vercel.app*

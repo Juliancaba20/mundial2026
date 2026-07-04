@@ -222,42 +222,53 @@ export function buildBracket(matches: Match[], knockoutResults: KnockoutResultsM
   }
 
   // ── 16avos (R32) — 16 partidos, cuadro oficial FIFA (partidos 73-88) ──────
+  // nextMatchId/nextPosition verificados contra el cuadro oficial de octavos
+  // (Yahoo Sports, partidos 89-96, 4 jul 2026): antes estaban mal armados
+  // (ej. R32-2 alimentaba R16-1 junto con R32-1, cuando en realidad el ganador
+  // de R32-2 —Alemania/Paraguay— juega contra el ganador de R32-5 —Francia—,
+  // no contra el ganador de R32-1 —Sudáfrica/Canadá—).
   const r32: BracketMatch[] = [
     { id:'R32-1',  round:'R32', date:'28 jun', kickoff:'2026-06-28T19:00:00Z', home:second('A'), away:second('B'),                status:'pending', nextMatchId:'R16-1', nextPosition:'home' }, // M73  12:00 PDT → 19:00 UTC
-    { id:'R32-2',  round:'R32', date:'29 jun', kickoff:'2026-06-29T20:30:00Z', home:first('E'),  away:thirdVs('E', 'A/B/C/D/F'),   status:'pending', nextMatchId:'R16-1', nextPosition:'away' }, // M74  16:30 EDT → 20:30 UTC
-    { id:'R32-3',  round:'R32', date:'1 jul',  kickoff:'2026-07-01T01:00:00Z', home:first('F'),  away:second('C'),                 status:'pending', nextMatchId:'R16-2', nextPosition:'home' }, // M75  19:00 MDT → 01:00 UTC
-    { id:'R32-4',  round:'R32', date:'29 jun', kickoff:'2026-06-29T17:00:00Z', home:first('C'),  away:second('F'),                 status:'pending', nextMatchId:'R16-2', nextPosition:'away' }, // M76  12:00 CDT → 17:00 UTC
-    { id:'R32-5',  round:'R32', date:'30 jun', kickoff:'2026-06-30T21:00:00Z', home:first('I'),  away:thirdVs('I', 'C/D/F/G/H'),   status:'pending', nextMatchId:'R16-3', nextPosition:'home' }, // M77  17:00 EDT → 21:00 UTC
+    { id:'R32-2',  round:'R32', date:'29 jun', kickoff:'2026-06-29T20:30:00Z', home:first('E'),  away:thirdVs('E', 'A/B/C/D/F'),   status:'pending', nextMatchId:'R16-2', nextPosition:'home' }, // M74  16:30 EDT → 20:30 UTC
+    { id:'R32-3',  round:'R32', date:'1 jul',  kickoff:'2026-07-01T01:00:00Z', home:first('F'),  away:second('C'),                 status:'pending', nextMatchId:'R16-1', nextPosition:'away' }, // M75  19:00 MDT → 01:00 UTC
+    { id:'R32-4',  round:'R32', date:'29 jun', kickoff:'2026-06-29T17:00:00Z', home:first('C'),  away:second('F'),                 status:'pending', nextMatchId:'R16-3', nextPosition:'home' }, // M76  12:00 CDT → 17:00 UTC
+    { id:'R32-5',  round:'R32', date:'30 jun', kickoff:'2026-06-30T21:00:00Z', home:first('I'),  away:thirdVs('I', 'C/D/F/G/H'),   status:'pending', nextMatchId:'R16-2', nextPosition:'away' }, // M77  17:00 EDT → 21:00 UTC
     { id:'R32-6',  round:'R32', date:'30 jun', kickoff:'2026-06-30T17:00:00Z', home:second('E'), away:second('I'),                 status:'pending', nextMatchId:'R16-3', nextPosition:'away' }, // M78  12:00 CDT → 17:00 UTC
     { id:'R32-7',  round:'R32', date:'1 jul',  kickoff:'2026-07-01T01:00:00Z', home:first('A'),  away:thirdVs('A', 'C/E/F/H/I'),   status:'pending', nextMatchId:'R16-4', nextPosition:'home' }, // M79  19:00 MDT → 01:00 UTC
     { id:'R32-8',  round:'R32', date:'1 jul',  kickoff:'2026-07-01T16:00:00Z', home:first('L'),  away:thirdVs('L', 'E/H/I/J/K'),   status:'pending', nextMatchId:'R16-4', nextPosition:'away' }, // M80  12:00 EDT → 16:00 UTC
-    { id:'R32-9',  round:'R32', date:'1 jul',  kickoff:'2026-07-02T00:00:00Z', home:first('D'),  away:thirdVs('D', 'B/E/F/I/J'),   status:'pending', nextMatchId:'R16-5', nextPosition:'home' }, // M81  17:00 PDT → 00:00 UTC
-    { id:'R32-10', round:'R32', date:'1 jul',  kickoff:'2026-07-01T20:00:00Z', home:first('G'),  away:thirdVs('G', 'A/E/H/I/J'),   status:'pending', nextMatchId:'R16-5', nextPosition:'away' }, // M82  13:00 PDT → 20:00 UTC
-    { id:'R32-11', round:'R32', date:'2 jul',  kickoff:'2026-07-02T23:00:00Z', home:second('K'), away:second('L'),                 status:'pending', nextMatchId:'R16-6', nextPosition:'home' }, // M83  19:00 EDT → 23:00 UTC
-    { id:'R32-12', round:'R32', date:'2 jul',  kickoff:'2026-07-02T19:00:00Z', home:first('H'),  away:second('J'),                 status:'pending', nextMatchId:'R16-6', nextPosition:'away' }, // M84  12:00 PDT → 19:00 UTC
-    { id:'R32-13', round:'R32', date:'3 jul',  kickoff:'2026-07-03T03:00:00Z', home:first('B'),  away:thirdVs('B', 'E/F/G/I/J'),   status:'pending', nextMatchId:'R16-7', nextPosition:'home' }, // M85  20:00 PDT → 03:00 UTC
+    { id:'R32-9',  round:'R32', date:'1 jul',  kickoff:'2026-07-02T00:00:00Z', home:first('D'),  away:thirdVs('D', 'B/E/F/I/J'),   status:'pending', nextMatchId:'R16-6', nextPosition:'away' }, // M81  17:00 PDT → 00:00 UTC
+    { id:'R32-10', round:'R32', date:'1 jul',  kickoff:'2026-07-01T20:00:00Z', home:first('G'),  away:thirdVs('G', 'A/E/H/I/J'),   status:'pending', nextMatchId:'R16-6', nextPosition:'home' }, // M82  13:00 PDT → 20:00 UTC
+    { id:'R32-11', round:'R32', date:'2 jul',  kickoff:'2026-07-02T23:00:00Z', home:second('K'), away:second('L'),                 status:'pending', nextMatchId:'R16-5', nextPosition:'away' }, // M83  19:00 EDT → 23:00 UTC
+    { id:'R32-12', round:'R32', date:'2 jul',  kickoff:'2026-07-02T19:00:00Z', home:first('H'),  away:second('J'),                 status:'pending', nextMatchId:'R16-5', nextPosition:'home' }, // M84  12:00 PDT → 19:00 UTC
+    { id:'R32-13', round:'R32', date:'3 jul',  kickoff:'2026-07-03T03:00:00Z', home:first('B'),  away:thirdVs('B', 'E/F/G/I/J'),   status:'pending', nextMatchId:'R16-8', nextPosition:'home' }, // M85  20:00 PDT → 03:00 UTC
     { id:'R32-14', round:'R32', date:'3 jul',  kickoff:'2026-07-03T22:00:00Z', home:first('J'),  away:second('H'),                 status:'pending', nextMatchId:'R16-7', nextPosition:'away' }, // M86  18:00 EDT → 22:00 UTC
-    { id:'R32-15', round:'R32', date:'4 jul',  kickoff:'2026-07-04T01:30:00Z', home:first('K'),  away:thirdVs('K', 'D/E/I/J/L'),   status:'pending', nextMatchId:'R16-8', nextPosition:'home' }, // M87  20:30 CDT → 01:30 UTC
-    { id:'R32-16', round:'R32', date:'3 jul',  kickoff:'2026-07-03T18:00:00Z', home:second('D'), away:second('G'),                 status:'pending', nextMatchId:'R16-8', nextPosition:'away' }, // M88  13:00 CDT → 18:00 UTC
+    { id:'R32-15', round:'R32', date:'4 jul',  kickoff:'2026-07-04T01:30:00Z', home:first('K'),  away:thirdVs('K', 'D/E/I/J/L'),   status:'pending', nextMatchId:'R16-8', nextPosition:'away' }, // M87  20:30 CDT → 01:30 UTC
+    { id:'R32-16', round:'R32', date:'3 jul',  kickoff:'2026-07-03T18:00:00Z', home:second('D'), away:second('G'),                 status:'pending', nextMatchId:'R16-7', nextPosition:'home' }, // M88  13:00 CDT → 18:00 UTC
   ]
 
-  // ── Octavos (R16) — 8 partidos ────────────────────────────────────────────
+  // ── Octavos (R16) — 8 partidos, verificados 1 a 1 contra el cuadro oficial ──
+  // R16-1 = M90 (Canadá/Marruecos), R16-2 = M89 (Paraguay/Francia),
+  // R16-3 = M91 (Brasil/Noruega), R16-4 = M92 (México/Inglaterra),
+  // R16-5 = M93 (España/Portugal), R16-6 = M94 (Bélgica/EE.UU.),
+  // R16-7 = M95 (Egipto/Argentina), R16-8 = M96 (Suiza/Colombia).
   const r16: BracketMatch[] = [
-    { id:'R16-1', round:'R16', date:'4 jul',  kickoff:'2026-07-04T17:00:00Z', home:emptySlot('G. R32-1'),  away:emptySlot('G. R32-2'),  status:'pending', nextMatchId:'QF-1', nextPosition:'home' }, // M90  12:00 CDT → 17:00 UTC
-    { id:'R16-2', round:'R16', date:'4 jul',  kickoff:'2026-07-04T21:00:00Z', home:emptySlot('G. R32-3'),  away:emptySlot('G. R32-4'),  status:'pending', nextMatchId:'QF-1', nextPosition:'away' }, // M89  17:00 EDT → 21:00 UTC
-    { id:'R16-3', round:'R16', date:'5 jul',  kickoff:'2026-07-05T20:00:00Z', home:emptySlot('G. R32-5'),  away:emptySlot('G. R32-6'),  status:'pending', nextMatchId:'QF-2', nextPosition:'home' }, // M91  16:00 EDT → 20:00 UTC
-    { id:'R16-4', round:'R16', date:'7 jul',  kickoff:'2026-07-07T00:00:00Z', home:emptySlot('G. R32-7'),  away:emptySlot('G. R32-8'),  status:'pending', nextMatchId:'QF-2', nextPosition:'away' }, // M92  18:00 CDT → 00:00 UTC
-    { id:'R16-5', round:'R16', date:'6 jul',  kickoff:'2026-07-06T19:00:00Z', home:emptySlot('G. R32-9'),  away:emptySlot('G. R32-10'), status:'pending', nextMatchId:'QF-3', nextPosition:'home' }, // M93  14:00 CDT → 19:00 UTC
-    { id:'R16-6', round:'R16', date:'7 jul',  kickoff:'2026-07-07T00:00:00Z', home:emptySlot('G. R32-11'), away:emptySlot('G. R32-12'), status:'pending', nextMatchId:'QF-3', nextPosition:'away' }, // M94  17:00 PDT → 00:00 UTC
-    { id:'R16-7', round:'R16', date:'7 jul',  kickoff:'2026-07-07T16:00:00Z', home:emptySlot('G. R32-13'), away:emptySlot('G. R32-14'), status:'pending', nextMatchId:'QF-4', nextPosition:'home' }, // M95  12:00 EDT → 16:00 UTC
-    { id:'R16-8', round:'R16', date:'7 jul',  kickoff:'2026-07-07T20:00:00Z', home:emptySlot('G. R32-15'), away:emptySlot('G. R32-16'), status:'pending', nextMatchId:'QF-4', nextPosition:'away' }, // M96  13:00 PDT → 20:00 UTC
+    { id:'R16-1', round:'R16', date:'4 jul',  kickoff:'2026-07-04T17:00:00Z', home:emptySlot('G. R32-1'),  away:emptySlot('G. R32-3'),  status:'pending', nextMatchId:'QF-1', nextPosition:'home' }, // M90  12:00 CDT → 17:00 UTC
+    { id:'R16-2', round:'R16', date:'4 jul',  kickoff:'2026-07-04T21:00:00Z', home:emptySlot('G. R32-2'),  away:emptySlot('G. R32-5'),  status:'pending', nextMatchId:'QF-1', nextPosition:'away' }, // M89  17:00 EDT → 21:00 UTC
+    { id:'R16-3', round:'R16', date:'5 jul',  kickoff:'2026-07-05T20:00:00Z', home:emptySlot('G. R32-4'),  away:emptySlot('G. R32-6'),  status:'pending', nextMatchId:'QF-3', nextPosition:'home' }, // M91  16:00 EDT → 20:00 UTC
+    { id:'R16-4', round:'R16', date:'6 jul',  kickoff:'2026-07-06T00:00:00Z', home:emptySlot('G. R32-7'),  away:emptySlot('G. R32-8'),  status:'pending', nextMatchId:'QF-3', nextPosition:'away' }, // M92  20:00 EDT (5 jul) → 00:00 UTC (6 jul)
+    { id:'R16-5', round:'R16', date:'6 jul',  kickoff:'2026-07-06T19:00:00Z', home:emptySlot('G. R32-12'), away:emptySlot('G. R32-11'), status:'pending', nextMatchId:'QF-2', nextPosition:'home' }, // M93  15:00 EDT → 19:00 UTC
+    { id:'R16-6', round:'R16', date:'7 jul',  kickoff:'2026-07-07T00:00:00Z', home:emptySlot('G. R32-10'), away:emptySlot('G. R32-9'),  status:'pending', nextMatchId:'QF-2', nextPosition:'away' }, // M94  20:00 EDT (6 jul) → 00:00 UTC (7 jul)
+    { id:'R16-7', round:'R16', date:'7 jul',  kickoff:'2026-07-07T16:00:00Z', home:emptySlot('G. R32-16'), away:emptySlot('G. R32-14'), status:'pending', nextMatchId:'QF-4', nextPosition:'home' }, // M95  12:00 EDT → 16:00 UTC
+    { id:'R16-8', round:'R16', date:'7 jul',  kickoff:'2026-07-07T20:00:00Z', home:emptySlot('G. R32-13'), away:emptySlot('G. R32-15'), status:'pending', nextMatchId:'QF-4', nextPosition:'away' }, // M96  16:00 EDT → 20:00 UTC
   ]
 
   // ── Cuartos (QF) — 4 partidos ─────────────────────────────────────────────
+  // QF-1 = M97 (ganador M89/M90), QF-2 = M98 (ganador M93/M94),
+  // QF-3 = M99 (ganador M91/M92), QF-4 = M100 (ganador M95/M96).
   const qf: BracketMatch[] = [
     { id:'QF-1', round:'QF', date:'9 jul',  kickoff:'2026-07-09T20:00:00Z', home:emptySlot('G. Oct. 1'), away:emptySlot('G. Oct. 2'), status:'pending', nextMatchId:'SF-1', nextPosition:'home' }, // M97  16:00 EDT → 20:00 UTC
-    { id:'QF-2', round:'QF', date:'10 jul', kickoff:'2026-07-10T19:00:00Z', home:emptySlot('G. Oct. 3'), away:emptySlot('G. Oct. 4'), status:'pending', nextMatchId:'SF-1', nextPosition:'away' }, // M98  12:00 PDT → 19:00 UTC
-    { id:'QF-3', round:'QF', date:'11 jul', kickoff:'2026-07-11T21:00:00Z', home:emptySlot('G. Oct. 5'), away:emptySlot('G. Oct. 6'), status:'pending', nextMatchId:'SF-2', nextPosition:'home' }, // M99  17:00 EDT → 21:00 UTC
+    { id:'QF-2', round:'QF', date:'10 jul', kickoff:'2026-07-10T19:00:00Z', home:emptySlot('G. Oct. 5'), away:emptySlot('G. Oct. 6'), status:'pending', nextMatchId:'SF-1', nextPosition:'away' }, // M98  12:00 PDT → 19:00 UTC
+    { id:'QF-3', round:'QF', date:'11 jul', kickoff:'2026-07-11T21:00:00Z', home:emptySlot('G. Oct. 3'), away:emptySlot('G. Oct. 4'), status:'pending', nextMatchId:'SF-2', nextPosition:'home' }, // M99  17:00 EDT → 21:00 UTC
     { id:'QF-4', round:'QF', date:'12 jul', kickoff:'2026-07-12T01:00:00Z', home:emptySlot('G. Oct. 7'), away:emptySlot('G. Oct. 8'), status:'pending', nextMatchId:'SF-2', nextPosition:'away' }, // M100 20:00 CDT → 01:00 UTC
   ]
 
