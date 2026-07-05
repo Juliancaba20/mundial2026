@@ -19,6 +19,7 @@
     "cristiano-vs-modric",
     "ecuador-expulsa-hincapie",
     "egipto-avanza-octavos",
+<<<<<<< HEAD
     "egipto-empata-con-iran",
     "egipto-iran-empate",
     "empate-entre-egipto-y-iran",
@@ -52,6 +53,13 @@
     "ultima-jornada-de-grupos",
     "uruguay-cae-ante-espana",
     "uruguay-eliminado-mundial"
+=======
+    "colombia-avanza-mundial",
+    "francia-avanza-octavos",
+    "francia-vence-paraguay",
+    "brasil-noruega-octavos",
+    "marruecos-elimina-canada"
+>>>>>>> 8ed388b9f71125affdf9c8b600b3a430649a6839
   ],
-  "lastRun": "2026-07-04T16:05:21.801Z"
+  "lastRun": "2026-07-05T12:20:17.711Z"
 }
