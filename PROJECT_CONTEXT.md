@@ -353,11 +353,18 @@ automation/state/published.json` con cwd = `automation/`, así que el pathspec d
 atrapaba y solo logueaba el error — **nunca se hacía commit ni push**, aunque el artículo sí
 se había generado (en la carpeta equivocada).
 
-Evidencia encontrada en el proyecto: 3 artículos reales generados el 27 jun 2026
-(`espana-juega-prime-time`, `empate-entre-egipto-y-iran`, `uruguay-eliminado-mundial`)
-atrapados en `automation/content/noticias/` y `automation/public/noticias/`, con su estado
-en `automation/automation/state/published.json` — nunca llegaron a `content/noticias/` ni se
-commitearon.
+Evidencia encontrada en el proyecto: el 4 jul 2026 se detectaron 3 artículos huérfanos
+(`espana-juega-prime-time`, `empate-entre-egipto-y-iran`, `uruguay-eliminado-mundial`) del
+27 jun, y se migraron + se aplicó este fix de `ROOT_DIR`. Pero el bug venía de más atrás: en
+una ejecución posterior sobre esta misma rama (con las animaciones ya agregadas) apareció un
+backlog mucho mayor — **45 artículos más** acumulados en `automation/content/noticias/` /
+`automation/public/noticias/`, generados día a día por el cron mientras el fix de `ROOT_DIR`
+en `git/index.ts`/`state/index.ts` todavía no estaba desplegado. Los 45 también se migraron a
+`content/noticias/` y `public/noticias/`, y `automation/state/published.json` se fusionó
+(unión de ambos estados, sin duplicados). **Regla:** si en el futuro aparecen más carpetas
+bajo `automation/content/` o `automation/public/`, es señal de que el fix de `ROOT_DIR` no
+llegó a desplegarse en algún momento — repetir este mismo proceso de migración (nunca hay que
+perder contenido ya generado, aunque haya quedado en la carpeta equivocada).
 
 **Solución aplicada:**
 1. `automation/config.ts` ahora exporta `ROOT_DIR`, calculado desde la ubicación del propio
@@ -531,6 +538,39 @@ Actions) es `automation/`, no la raíz del repo.
   **SF-2** (QF-3 home + QF-4 away) = M102 (15 jul), **3RD** = perdedores SF-1/SF-2 (18 jul),
   **F** = ganadores SF-1/SF-2 (19 jul). No tocar esa parte — solo R32→R16 y QF-2↔QF-3 estaban
   invertidos.
+
+**11. `resolveMatchResult()` nunca propagaba el ganador cuando el partido terminó empatado
+  (penales/tiempo suplementario) — el bug real detrás de "Alemania-Paraguay ya se jugó pero
+  aparece como si no" (4 jul 2026)**
+- **Sintoma:** Los bugs #7/#9 (agregar `STATUS_FINAL_PEN`/`STATUS_FINAL_AET` a los status
+  "terminado") NO alcanzaban. Alemania 1-1 Paraguay, Países Bajos 1-1 Marruecos y Australia
+  1-1 Egipto seguían sin propagar el ganador al bracket incluso después de esos fixes, y por
+  eso el cuadro se veía "mal armado" en cuartos y rondas siguientes (mostraba combinaciones de
+  equipos que en realidad ya estaban descartadas).
+- **Causa real:** `ownScore`/`opponentScore` en `KnockoutTeamResult` vienen del campo `score`
+  de ESPN, que para partidos definidos por penales queda **empatado** (ESPN no refleja el
+  resultado de la tanda de penales ahí, solo en un campo aparte). `resolveMatchResult()` en
+  `lib/bracket.ts` comparaba `homeScoreNum === awayScoreNum` y, si eran iguales, devolvía
+  `null` ("empate sin penales resueltos aún") — pero para un partido con status `done`, un
+  empate en `score` casi siempre significa "se definió por penales", no "todavía no terminó".
+  El resultado nunca se podía determinar solo con el score.
+- **Solución:** ESPN ya expone un campo `competitor.winner` (booleano) en cada evento, que sí
+  contempla penales y tiempo suplementario. Se agregó:
+  1. `winner?: boolean` a `ESPNCompetitor` (`types/index.ts`).
+  2. `isWinner: boolean | null` a `KnockoutTeamResult` (`types/index.ts`), poblado en
+     `lib/espn.ts` desde `ht.winner`/`at.winner`.
+  3. `resolveMatchResult()` en `lib/bracket.ts` ahora usa `isWinner` cuando el score viene
+     empatado, en vez de devolver `null` directamente. Solo devuelve `null` (no propagar
+     todavía) si ESPN tampoco informó `winner` (ej. la tanda de penales sigue en curso).
+- **Por qué no se detectó en la corrección anterior:** los fixes de status (#7, #9) sí hacían
+  que estos partidos se reconocieran como `done`, y por eso `/api/debug` mostraba
+  `"classification": "done"` correctamente — pero ese endpoint solo verifica el status, no si
+  el bracket logra determinar un ganador. El bug vivía un paso más adelante, en
+  `resolveMatchResult()`, que no tiene equivalente en `/api/debug`.
+- **Regla para el futuro:** si `/api/debug` muestra un partido de eliminatorias como `"done"`
+  pero el bracket en `/eliminatorias` no lo refleja, el problema ya NO es de status — hay que
+  mirar directamente `resolveMatchResult()` en `lib/bracket.ts`, no volver a tocar
+  `lib/espn.ts`.
 
 ### Cómo diagnosticar rápidamente
 1. Abrir `/api/debug` en producción

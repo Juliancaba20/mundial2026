@@ -280,6 +280,7 @@ export async function fetchLiveResults(): Promise<FetchResultsOutput> {
               opponentName: atName,
               ownScore: ht.score,
               opponentScore: at.score,
+              isWinner: typeof ht.winner === 'boolean' ? ht.winner : null,
               status: statusKO,
               clock: ev.status?.displayClock ?? '',
             }
@@ -294,6 +295,7 @@ export async function fetchLiveResults(): Promise<FetchResultsOutput> {
               opponentName: htName,
               ownScore: at.score,
               opponentScore: ht.score,
+              isWinner: typeof at.winner === 'boolean' ? at.winner : null,
               status: statusKO,
               clock: ev.status?.displayClock ?? '',
             }

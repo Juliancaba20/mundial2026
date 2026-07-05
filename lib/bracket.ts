@@ -119,7 +119,26 @@ function resolveMatchResult(
   const homeScoreNum = parseInt(homeScoreStr, 10)
   const awayScoreNum = parseInt(awayScoreStr, 10)
   if (isNaN(homeScoreNum) || isNaN(awayScoreNum)) return null
-  if (homeScoreNum === awayScoreNum) return null // empate sin penales resueltos aún: no propagar
+
+  if (homeScoreNum === awayScoreNum) {
+    // Empate en el marcador que nos da ESPN (tiempo regular o suplementario):
+    // pasa siempre que el partido se definió por penales (ESPN no refleja el
+    // resultado de la tanda en `score`, solo en `winner`). Bug histórico: acá
+    // se devolvía null y el ganador nunca se propagaba (Alemania-Paraguay,
+    // Países Bajos-Marruecos, Australia-Egipto).
+    // `isWinner` viene directo de ESPN (competitor.winner) y sí contempla
+    // penales/tiempo suplementario.
+    const homeIsWinner = fromHome ? result.isWinner : (result.isWinner === null ? null : !result.isWinner)
+    if (homeIsWinner === true) {
+      return { kind: 'done', winner: home, homeScore: String(homeScoreNum), awayScore: String(awayScoreNum) }
+    }
+    if (homeIsWinner === false) {
+      return { kind: 'done', winner: away, homeScore: String(homeScoreNum), awayScore: String(awayScoreNum) }
+    }
+    // ESPN tampoco informó winner todavía (ej. está resolviendo la tanda) —
+    // no propagamos hasta tener un ganador confirmado.
+    return null
+  }
 
   const winner = homeScoreNum > awayScoreNum ? home : away
   return {

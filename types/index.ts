@@ -123,6 +123,9 @@ export interface Noticia {
 export interface ESPNCompetitor {
   homeAway: 'home' | 'away'
   score?: string
+  winner?: boolean  // ESPN ya calcula el ganador (incluye penales/tiempo suplementario) —
+                    // más confiable que comparar ownScore/opponentScore, que quedan
+                    // empatados cuando el partido se definió por penales.
   team: { displayName: string; name: string }
 }
 
@@ -161,6 +164,11 @@ export interface KnockoutTeamResult {
   opponentName: string         // nombre tal como lo reportó ESPN, para debug
   ownScore: string
   opponentScore: string
+  isWinner: boolean | null      // viene de ESPN (competitor.winner) — null si ESPN no lo informó
+                                 // (partido en vivo o status desconocido). Es la fuente de verdad
+                                 // para propagar en el bracket cuando ownScore === opponentScore
+                                 // (partido definido por penales o con score de ESPN sin el
+                                 // desempate, ej. STATUS_FINAL_PEN / STATUS_FINAL_AET).
   status: MatchStatus
   clock: string
 }
