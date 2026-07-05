@@ -23,6 +23,48 @@ function applyResults(matches: Match[], results: LiveResultsMap): Match[] {
   })
 }
 
+// ─── Pool combinado para la home: grupos + eliminatorias ──────────────────────
+// Bug histórico: FeaturedMatchesClient/MatchStripClient solo miraban
+// BASE_MATCHES (fase de grupos, terminada desde el 27 jun). Una vez que el
+// torneo pasa a eliminatorias, "lo más reciente/próximo" siempre caía en un
+// partido de grupos viejo porque los partidos de eliminatorias (que viven en
+// buildBracket(), no en BASE_MATCHES) nunca entraban al cálculo. Esto arma un
+// pool único con ambos, ya ordenado por kickoff, para que "hoy"/"en vivo"
+// funcione automáticamente en cualquier fase del torneo sin tocar código.
+function bracketMatchToFeatured(bm: BracketMatch): Match | null {
+  if (!bm.home.team || !bm.away.team) return null // slot todavía no definido (TBD)
+  const dateSort = bm.kickoff ? Number(bm.kickoff.slice(0, 10).replace(/-/g, '')) : 0
+  return {
+    id: bm.id,
+    date: bm.date,
+    dateSort,
+    kickoff: bm.kickoff ?? '',
+    group: ROUND_LABELS[bm.round] ?? bm.round, // ej. "Octavos" — se muestra sin el prefijo "Grupo"
+    home: bm.home.team,
+    away: bm.away.team,
+    venue: '',
+    city: '',
+    score: bm.home.score !== undefined ? `${bm.home.score} – ${bm.away.score}` : undefined,
+    status: bm.status,
+    clock: bm.clock,
+  }
+}
+
+function buildFeaturedPool(
+  baseMatches: Match[],
+  results: LiveResultsMap,
+  knockoutResults: KnockoutResultsMap
+): Match[] {
+  const groupMatches = applyResults(baseMatches, results)
+  const bracket = buildBracket(groupMatches, knockoutResults)
+  const bracketMatches = bracket
+    .map(bracketMatchToFeatured)
+    .filter((m): m is Match => m !== null)
+  return [...groupMatches, ...bracketMatches].sort(
+    (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
+  )
+}
+
 function getLocalDateLabel(kickoff: string): string {
   const d = new Date(kickoff)
   if (isNaN(d.getTime())) return ''
@@ -316,6 +358,9 @@ function HeroCard({ m }: { m: Match }) {
   const isLive = m.status === 'live'
   const isDone = m.status === 'done'
   const scoreText = m.status === 'pending' ? null : m.score
+  // m.group es una letra (A-L) en fase de grupos, o el nombre de la ronda
+  // (ej. "Octavos") para partidos de eliminatorias — sin el prefijo "Grupo".
+  const groupLabel = m.group.length === 1 ? `Grupo ${m.group}` : m.group
 
   return (
     <motion.a
@@ -329,7 +374,7 @@ function HeroCard({ m }: { m: Match }) {
       style={{ textDecoration: 'none', display: 'block' }}
     >
       <div className="mh-top">
-        <span className="mh-group">Grupo {m.group}</span>
+        <span className="mh-group">{groupLabel}</span>
         {isLive && (
           <span className="mh-badge-live"><span className="live-dot" style={{ width: 6, height: 6 }} /> EN VIVO {m.clock}</span>
         )}
@@ -374,8 +419,8 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
     try {
       const res = await fetch('/api/resultados', { cache: 'no-store' })
       if (!res.ok) return
-      const data: { results: LiveResultsMap } = await res.json()
-      setMatches(applyResults(initialMatches, data.results ?? {}))
+      const data: { results: LiveResultsMap; knockoutResults?: KnockoutResultsMap } = await res.json()
+      setMatches(buildFeaturedPool(initialMatches, data.results ?? {}, data.knockoutResults ?? {}))
     } catch { /* mantiene datos actuales */ }
   }, [initialMatches])
 
@@ -432,7 +477,7 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
                 style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column' }}
               >
                 <div className="fm-top">
-                  <span className="fm-group">Grupo {m.group}</span>
+                  <span className="fm-group">{m.group.length === 1 ? `Grupo ${m.group}` : m.group}</span>
                   {badge}
                 </div>
                 <div className="fm-teams">
@@ -464,8 +509,8 @@ export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }
     try {
       const res = await fetch('/api/resultados', { cache: 'no-store' })
       if (!res.ok) return
-      const data: { results: LiveResultsMap } = await res.json()
-      setMatches(applyResults(initialMatches, data.results ?? {}))
+      const data: { results: LiveResultsMap; knockoutResults?: KnockoutResultsMap } = await res.json()
+      setMatches(buildFeaturedPool(initialMatches, data.results ?? {}, data.knockoutResults ?? {}))
     } catch { /* mantiene datos actuales */ }
   }, [initialMatches])
 

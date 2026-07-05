@@ -264,20 +264,21 @@ button { font-family: var(--body); cursor: pointer; }
 .fm-venue { font-size: 10px; color: var(--faint); text-align: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 
 /* ── NEWS ──────────────────────────────────────────────────────────────── */
-.news-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
-.news-grid-index { grid-template-columns: repeat(3, 1fr); }
+/* Grilla pareja: todas las cards del mismo tamaño, sin huecos.
+   Antes: "2fr 1fr 1fr" + .featured{grid-row:span 2} rompía el auto-placement
+   (la card destacada quedaba sola con hueco al lado, e imágenes con aspect-ratio
+   distinto se veían "alargadas"). */
+.news-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.news-grid-index { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .news-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; cursor: pointer; transition: border-color .2s; display: block; }
 .news-card:hover { border-color: var(--border2); }
-.news-card.featured { grid-row: span 2; }
 .news-img { position: relative; width: 100%; aspect-ratio: 16/9; background: linear-gradient(135deg, var(--surface2), var(--surface3)); display: flex; align-items: center; justify-content: center; font-size: 48px; overflow: hidden; }
-.news-card.featured .news-img { aspect-ratio: 16/10; font-size: 64px; }
 .news-img-emoji { line-height: 1; }
 .news-img.has-image { background: var(--surface2); }
 .news-img-pic { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .news-body { padding: 14px 16px; }
 .news-tag { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--green); margin-bottom: 6px; }
 .news-headline { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.4; margin-bottom: 6px; }
-.news-card.featured .news-headline { font-size: 18px; }
 .news-meta { font-size: 11px; color: var(--muted); }
 
 /* ── TEAMS SCROLL ──────────────────────────────────────────────────────── */
@@ -509,7 +510,6 @@ button { font-family: var(--body); cursor: pointer; }
   .cd-num { font-size: 36px; }
   .home-body, .content-area { padding-left: 16px; padding-right: 16px; }
   .news-grid { grid-template-columns: 1fr; }
-  .news-card.featured { grid-row: auto; }
   .m-venue-s { display: none; }
   .team-hero { flex-direction: column; align-items: flex-start; }
   .squad-grid { grid-template-columns: repeat(2, 1fr); }

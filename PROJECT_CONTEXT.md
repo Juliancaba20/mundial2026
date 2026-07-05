@@ -572,6 +572,51 @@ Actions) es `automation/`, no la raíz del repo.
   mirar directamente `resolveMatchResult()` en `lib/bracket.ts`, no volver a tocar
   `lib/espn.ts`.
 
+**12. Líneas conectoras del árbol de eliminatorias mal dibujadas visualmente (5 jul 2026)**
+- **Síntoma:** los EQUIPOS que aparecían en cada cruce ya eran correctos (bug #10 resuelto),
+  pero las líneas verdes que conectan los partidos en `/eliminatorias` (vista desktop) unían
+  visualmente partidos que no se cruzan en la realidad — ej. mostraban Sudáfrica/Canadá
+  conectado con Alemania/Paraguay, cuando el cruce real de Canadá es con el ganador de Países
+  Bajos/Marruecos.
+- **Causa:** `ConnectorLayer` en `components/BracketView.tsx` calculaba los "padres" de cada
+  partido por **posición en el array** (`toIdx*2` y `toIdx*2+1`), no por `nextMatchId` real.
+  Esa cuenta solo da bien si el array de cada ronda está ordenado en "orden de árbol visual"
+  (pares consecutivos que realmente se enfrentan) — pero el array se define en
+  `lib/bracket.ts` en orden de numeración oficial FIFA (R32-1..R32-16), que no coincide con el
+  orden de árbol visual.
+- **Solución:** se agregaron `R32_VISUAL_ORDER` y `R16_VISUAL_ORDER` en
+  `components/BracketView.tsx` — listas que reordenan cada ronda SOLO para el render (no
+  tocan `id`/`nextMatchId`/`lib/bracket.ts`), de forma que las posiciones consecutivas del
+  array sí correspondan a cruces reales. QF y SF no necesitaron reordenarse (su orden de
+  definición ya es el correcto).
+- **Regla para el futuro:** si se agrega o cambia un cruce en `lib/bracket.ts`, hay que
+  actualizar `R32_VISUAL_ORDER`/`R16_VISUAL_ORDER` en `BracketView.tsx` para que sigan
+  reflejando qué partido realmente alimenta a cuál — si no, el árbol vuelve a verse mal aunque
+  los datos estén bien.
+
+**13. La home mostraba partidos del principio del torneo en vez de "hoy"/"en vivo" (5 jul 2026)**
+- **Síntoma:** en la página principal, tanto el partido destacado como el strip de partidos
+  seguían mostrando partidos de fase de grupos de las primeras fechas del torneo, en vez del
+  partido de hoy o el que está en vivo.
+- **Causa:** `FeaturedMatchesClient` y `MatchStripClient` (`components/MatchesClient.tsx`)
+  solo trabajaban con `BASE_MATCHES` (los 72 partidos de fase de grupos). Los partidos de
+  eliminatorias NO viven en `BASE_MATCHES` — se generan aparte, vía `buildBracket()` — así que
+  una vez terminada la fase de grupos (todos `done`), el `hero`/strip nunca tenía ningún
+  partido `live`/`pending` real para elegir y caía siempre en "el último partido de grupos".
+- **Solución:** se agregó `buildFeaturedPool()` en `components/MatchesClient.tsx`, que arma un
+  pool único de partidos de grupos + eliminatorias (convirtiendo cada `BracketMatch` ya
+  resuelto — con ambos equipos definidos — a la forma `Match`), ordenado por `kickoff`.
+  `FeaturedMatchesClient` y `MatchStripClient` ahora arman ese pool combinado en cada fetch
+  (cada 60s, junto con `knockoutResults`), así que la lógica existente de "en vivo > próximo >
+  último jugado" funciona sola en cualquier fase del torneo, sin tocar código día a día.
+- **Detalle menor:** para partidos de eliminatorias, la card ya no muestra "Grupo Octavos"
+  (no tenía sentido) — si `m.group` no es una sola letra (A-L), se muestra directamente el
+  nombre de la ronda.
+- **Regla para el futuro:** cualquier componente nuevo que necesite "el partido de hoy" o
+  "el próximo partido" debe usar `buildFeaturedPool()` (o un pool equivalente que incluya
+  eliminatorias), nunca iterar `BASE_MATCHES` solo — deja de reflejar la realidad apenas
+  termina la fase de grupos.
+
 ### Cómo diagnosticar rápidamente
 1. Abrir `/api/debug` en producción
 2. Ver `matched` para confirmar qué partidos se procesaron
@@ -658,6 +703,8 @@ npm run build
 | `automation/config.ts` | Define `ROOT_DIR`. Si se rompe, todo el pipeline de noticias escribe/commitea en la carpeta equivocada (ver bug histórico #7 en "Sistema de noticias automatizado") |
 | `automation/git/index.ts` | Comandos git deben correr con `cwd: ROOT_DIR`, nunca con el cwd por defecto |
 | `.github/workflows/auto-news.yml` | Define `working-directory: automation` — cualquier ruta nueva en `automation/` debe resolverse vía `ROOT_DIR`, no `process.cwd()` |
+| `components/BracketView.tsx` | `R32_VISUAL_ORDER`/`R16_VISUAL_ORDER` deben reflejar los cruces reales de `lib/bracket.ts` — si se desincronizan, el árbol dibuja líneas conectoras a los partidos equivocados aunque los datos estén bien (ver bug #12) |
+| `components/MatchesClient.tsx` | `buildFeaturedPool()` es lo único que hace que la home muestre "hoy"/"en vivo" en eliminatorias — no reemplazar por iterar `BASE_MATCHES` solo (ver bug #13) |
 
 ---
 
@@ -680,6 +727,8 @@ npm run build
 8. **Nunca usar `process.cwd()` dentro de `automation/`:** El workflow de GitHub Actions corre los scripts con `working-directory: automation`, así que `process.cwd()` NO es la raíz del repo ahí dentro. Siempre resolver rutas con `ROOT_DIR` (exportado desde `automation/config.ts`). Este bug hizo que 3 noticias reales se generaran pero nunca se publicaran (ver sección "Sistema de noticias automatizado").
 
 9. **Un bracket que "se ve mal armado" puede ser dos cosas distintas — chequear ambas:** (a) un `status` de ESPN no reconocido que impide que un resultado ya jugado se propague (bugs #7, #9), o (b) un error real de `nextMatchId`/`nextPosition` en `lib/bracket.ts` que cruza rondas incorrectamente (bug #10, real, ya corregido el 4 jul 2026). Antes de tocar `lib/bracket.ts`, contrastar el cuadro contra una fuente oficial numerada (FIFA.com, o la numeración de partidos 73-104 de Yahoo/CBS/FOX Sports) — no asumir que los R32 se emparejan en orden consecutivo hacia R16. La tabla de referencia completa está en la sección "Bracket FIFA" más abajo.
+
+10. **`grid-row: span N` con filas implícitas (`auto`) es frágil:** en `.news-grid`, una card marcada `.featured` con `grid-row: span 2` producía huecos vacíos y cards de altura inconsistente ("alargadas"), porque el alto de cada fila implícita se calcula por separado y no coincide con el contenido de la card que abarca 2 filas. Se sacó el `span` y se unificó `.news-grid`/`.news-grid-index` a `repeat(auto-fill, minmax(260px, 1fr))` — todas las cards del mismo tamaño, sin huecos. Si en el futuro se quiere una noticia destacada más grande, mejor usar un layout aparte (ej. una card hero fuera del grid) en vez de `grid-row: span N` dentro de una grilla de alto implícito.
 
 ---
 
@@ -728,6 +777,6 @@ npx tsc --noEmit && npm run build
 
 ---
 
-*Última actualización: 4 jul 2026 (fix STATUS_FINAL_PEN/STATUS_FINAL_AET en eliminatorias, fix rutas del automation de noticias con ROOT_DIR, fix cruce R16→QF del bracket, tabla de referencia oficial del cuadro agregada)*
+*Última actualización: 5 jul 2026 (fix `resolveMatchResult()` con `winner` de ESPN, fix líneas conectoras del árbol de eliminatorias, fix home mostrando partidos viejos en vez de "hoy"/"en vivo", migración de 45 noticias huérfanas, fix grilla de noticias — cards con hueco/alargadas)*
 *Repo: https://github.com/Juliancaba20/mundial2026*
 *Producción: https://mundial2026-blond-pi.vercel.app*

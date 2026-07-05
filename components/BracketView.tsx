@@ -120,6 +120,27 @@ const COL_GAP = 60       // gap entre columnas (espacio para conectores)
 
 const ROUND_ORDER: BracketRound[] = ['R32', 'R16', 'QF', 'SF', 'F']
 
+// ─── Orden visual del árbol (NO es el orden de creación en lib/bracket.ts) ────
+// ConnectorLayer asume que el partido i de una ronda es alimentado por los
+// partidos 2i y 2i+1 de la ronda anterior (posición en el array, no nextMatchId).
+// Esa asunción es correcta SOLO si los arrays de cada ronda están ordenados así.
+// El orden de definición en lib/bracket.ts es el "oficial" (R32-1..R32-16,
+// R16-1..R16-8) y NO respeta esa asunción — por eso el árbol se veía mal
+// armado visualmente (uníamos Sudáfrica/Canadá con Alemania/Paraguay cuando en
+// realidad Canadá se cruza con el ganador de Países Bajos/Marruecos).
+// Estos arrays reordenan cada ronda para el render, sin tocar id/nextMatchId.
+const R32_VISUAL_ORDER = [
+  'R32-1', 'R32-3', 'R32-2', 'R32-5', 'R32-12', 'R32-11', 'R32-10', 'R32-9',
+  'R32-4', 'R32-6', 'R32-7', 'R32-8', 'R32-16', 'R32-14', 'R32-13', 'R32-15',
+]
+const R16_VISUAL_ORDER = ['R16-1', 'R16-2', 'R16-5', 'R16-6', 'R16-3', 'R16-4', 'R16-7', 'R16-8']
+// QF y SF ya quedan en orden visual correcto con el orden de definición
+// (QF-1,QF-2,QF-3,QF-4 / SF-1,SF-2) — no necesitan reordenarse.
+
+function sortByVisualOrder(matches: BracketMatch[], order: string[]): BracketMatch[] {
+  return [...matches].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
+}
+
 const ROUND_SCALE: Record<BracketRound, 'sm' | 'md' | 'lg' | 'xl'> = {
   R32: 'sm', R16: 'sm', QF: 'md', SF: 'lg', F: 'xl', '3RD': 'md',
 }
