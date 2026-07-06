@@ -524,20 +524,43 @@ export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }
 
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
   const live = matches.filter(m => m.status === 'live')
-  const todayMs = matches.filter(m => String(m.dateSort) === today && m.status !== 'live')
-  const recent = matches.filter(m => m.status === 'done').slice(-6)
-  const upcoming = matches.filter(m => m.status === 'pending').slice(0, 4)
+  const doneSorted = matches.filter(m => m.status === 'done')       // orden ascendente por kickoff
+  const pendingSorted = matches.filter(m => m.status === 'pending') // orden ascendente por kickoff
 
+  // Objetivo: mostrar siempre 6 partidos (mezcla de los últimos jugados y los
+  // próximos), no solo "los de hoy" — antes, si hoy había 2 partidos, el
+  // marquee se quedaba con esos 2 nada más y se movía demasiado rápido.
+  const TARGET = 6
   let toShow: Match[]
-  let labelText: string
-  let isLiveLabel = false
 
-  if (live.length) { toShow = live; labelText = 'EN VIVO'; isLiveLabel = true }
-  else if (todayMs.length) { toShow = todayMs.slice(0, 5); labelText = 'HOY' }
-  else if (recent.length) { toShow = recent; labelText = 'ÚLTIMOS' }
-  else { toShow = upcoming; labelText = 'PRÓXIMOS' }
+  if (live.length >= TARGET) {
+    toShow = live
+  } else {
+    const remaining = TARGET - live.length
+    let wantUpcoming = Math.ceil(remaining / 2)
+    let wantRecent = remaining - wantUpcoming
+    let upcomingPart = pendingSorted.slice(0, wantUpcoming)
+    let recentPart = doneSorted.slice(Math.max(0, doneSorted.length - wantRecent))
+    const short = remaining - upcomingPart.length - recentPart.length
+    if (short > 0) {
+      if (upcomingPart.length < wantUpcoming) {
+        recentPart = doneSorted.slice(Math.max(0, doneSorted.length - (wantRecent + short)))
+      } else if (recentPart.length < wantRecent) {
+        upcomingPart = pendingSorted.slice(0, wantUpcoming + short)
+      }
+    }
+    toShow = [...live, ...recentPart, ...upcomingPart].sort(
+      (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
+    )
+  }
 
   if (!toShow.length) return null
+
+  const hasToday = toShow.some(m => String(m.dateSort) === today)
+  const allDone = toShow.every(m => m.status === 'done')
+  const allPending = toShow.every(m => m.status === 'pending')
+  const labelText = live.length ? 'EN VIVO' : hasToday ? 'HOY' : allDone ? 'ÚLTIMOS' : allPending ? 'PRÓXIMOS' : 'PARTIDOS'
+  const isLiveLabel = live.length > 0
 
   // Para crear un bucle infinito continuo en el marquee, repetimos el array para que cubra todo el ancho de pantalla.
   // El número de repeticiones debe ser par para que la animación con translate3d(-50%, 0, 0) sea visualmente idéntica al inicio.

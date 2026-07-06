@@ -730,6 +730,8 @@ npm run build
 
 10. **`grid-row: span N` con filas implícitas (`auto`) es frágil:** en `.news-grid`, una card marcada `.featured` con `grid-row: span 2` producía huecos vacíos y cards de altura inconsistente ("alargadas"), porque el alto de cada fila implícita se calcula por separado y no coincide con el contenido de la card que abarca 2 filas. Se sacó el `span` y se unificó `.news-grid`/`.news-grid-index` a `repeat(auto-fill, minmax(260px, 1fr))` — todas las cards del mismo tamaño, sin huecos. Si en el futuro se quiere una noticia destacada más grande, mejor usar un layout aparte (ej. una card hero fuera del grid) en vez de `grid-row: span N` dentro de una grilla de alto implícito.
 
+11. **El marquee de la home no debe depender solo de "los partidos de hoy":** `MatchStripClient` filtraba estrictamente por `dateSort === hoy`, así que en un día con pocos partidos (ej. 2) el marquee quedaba con muy pocos elementos y se movía demasiado rápido (loop corto). Se corrigió para que siempre apunte a un total fijo (`TARGET = 6`), completando con los últimos jugados y los próximos a jugarse cuando el día tiene menos partidos que ese objetivo. Los partidos en vivo siempre se incluyen aparte y no cuentan como "relleno".
+
 ---
 
 ## Guía para futuros agentes
@@ -777,6 +779,6 @@ npx tsc --noEmit && npm run build
 
 ---
 
-*Última actualización: 5 jul 2026 (fix `resolveMatchResult()` con `winner` de ESPN, fix líneas conectoras del árbol de eliminatorias, fix home mostrando partidos viejos en vez de "hoy"/"en vivo", migración de 45 noticias huérfanas, fix grilla de noticias — cards con hueco/alargadas)*
+*Última actualización: 5 jul 2026 (fix `resolveMatchResult()` con `winner` de ESPN, fix líneas conectoras del árbol de eliminatorias, fix home mostrando partidos viejos en vez de "hoy"/"en vivo", migración de 45 noticias huérfanas, fix grilla de noticias, fix marquee de la home a un objetivo fijo de 6 partidos)*
 *Repo: https://github.com/Juliancaba20/mundial2026*
 *Producción: https://mundial2026-blond-pi.vercel.app*
