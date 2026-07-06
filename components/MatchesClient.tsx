@@ -537,8 +537,8 @@ export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }
     toShow = live
   } else {
     const remaining = TARGET - live.length
-    let wantUpcoming = Math.ceil(remaining / 2)
-    let wantRecent = remaining - wantUpcoming
+    const wantUpcoming = Math.ceil(remaining / 2)
+    const wantRecent = remaining - wantUpcoming
     let upcomingPart = pendingSorted.slice(0, wantUpcoming)
     let recentPart = doneSorted.slice(Math.max(0, doneSorted.length - wantRecent))
     const short = remaining - upcomingPart.length - recentPart.length

@@ -27,12 +27,14 @@ const listVariants = {
 } as const
 
 const cardVariants = {
-  hidden: { opacity: 0, scale: 0.9, y: 15 },
+  hidden: { opacity: 0, scale: 0.9, y: 15, rotateY: -25, z: -50 },
   visible: {
     opacity: 1,
     scale: 1,
     y: 0,
-    transition: { type: 'spring', stiffness: 260, damping: 20 },
+    rotateY: 0,
+    z: 0,
+    transition: { type: 'spring', stiffness: 220, damping: 18 },
   },
 } as const
 
@@ -44,7 +46,14 @@ export function FeaturedTeamsClient({ teams }: Props) {
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, margin: '-20px' }}
-      style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '12px' }}
+      style={{
+        display: 'flex',
+        gap: '16px',
+        overflowX: 'auto',
+        paddingBottom: '12px',
+        perspective: '1000px',
+        transformStyle: 'preserve-3d',
+      }}
     >
       {teams.map(t => (
         <motion.div
