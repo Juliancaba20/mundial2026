@@ -6,7 +6,7 @@ import type { BracketMatch, BracketRound, BracketSlot, LiveResultsMap, KnockoutR
 import { buildBracket, ROUND_LABELS, ROUND_DATES } from '@/lib/bracket'
 import { BASE_MATCHES } from '@/lib/data'
 import { TeamFlag } from './TeamFlag'
-import { motion, AnimatePresence } from 'motion/react'
+import { motion } from 'motion/react'
 
 
 // ─── Aplicar resultados ESPN al array de partidos base ────────────────────────
@@ -378,20 +378,8 @@ function BracketMobileTabs({ bracket }: { bracket: BracketMatch[] }) {
         })}
       </div>
       <div className="brm-date">{ROUND_DATES[active]}</div>
-      <div style={{ perspective: '1200px', transformStyle: 'preserve-3d', minHeight: '300px' }}>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={active}
-            initial={{ opacity: 0, rotateY: -15, scale: 0.96, z: -40 }}
-            animate={{ opacity: 1, rotateY: 0, scale: 1, z: 0 }}
-            exit={{ opacity: 0, rotateY: 15, scale: 0.96, z: -40 }}
-            transition={{ duration: 0.3, ease: [0.25, 1, 0.5, 1] }}
-            className="brm-matches"
-            style={{ transformStyle: 'preserve-3d' }}
-          >
-            {matches.map(m => <MatchCard key={m.id} match={m} scale={scale} highlight={active === 'F'} />)}
-          </motion.div>
-        </AnimatePresence>
+      <div className="brm-matches">
+        {matches.map(m => <MatchCard key={m.id} match={m} scale={scale} highlight={active === 'F'} />)}
       </div>
     </div>
   )

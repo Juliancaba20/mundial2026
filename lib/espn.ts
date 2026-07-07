@@ -129,47 +129,23 @@ function matchTeamName(espnName: string, ourName: string): boolean {
 }
 
 async function fetchDateResults(
-  dateStr: string,
-  isPast: boolean
+  dateStr: string
 ): Promise<{ data: ESPNResponse | null; dateStr: string }> {
   const url = `${ESPN_BASE}?dates=${dateStr}&limit=20`
-  const maxRetries = 2
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const fetchOptions: RequestInit = {
-        headers: { 'Accept': 'application/json' },
-      }
-
-      if (isPast) {
-        // Cache long-term for past dates (1 day)
-        fetchOptions.next = { revalidate: 86400 }
-      } else {
-        // Revalidate frequently for live/current dates
-        fetchOptions.next = { revalidate: 30 }
-      }
-
-      const res = await fetch(url, fetchOptions)
-      if (!res.ok) {
-        console.warn(`[ESPN] HTTP ${res.status} para fecha ${dateStr} (intento ${attempt}/${maxRetries})`)
-        if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 300 * attempt))
-          continue
-        }
-        return { data: null, dateStr }
-      }
-      const data = await res.json() as ESPNResponse
-      return { data, dateStr }
-    } catch (err) {
-      console.warn(`[ESPN] Error de red para fecha ${dateStr} (intento ${attempt}/${maxRetries}):`, err)
-      if (attempt < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 300 * attempt))
-        continue
-      }
+  try {
+    const res = await fetch(url, {
+      next: { revalidate: 60 },
+      headers: { 'Accept': 'application/json' },
+    })
+    if (!res.ok) {
+      console.warn(`[ESPN] HTTP ${res.status} para fecha ${dateStr}`)
       return { data: null, dateStr }
     }
+    return { data: await res.json() as ESPNResponse, dateStr }
+  } catch (err) {
+    console.warn(`[ESPN] Error de red para fecha ${dateStr}:`, err)
+    return { data: null, dateStr }
   }
-  return { data: null, dateStr }
 }
 
 export interface FetchResultsOutput {
@@ -193,28 +169,11 @@ export async function fetchLiveResults(): Promise<FetchResultsOutput> {
     return { results: {}, knockoutResults: {} }
   }
 
-  console.log(`[ESPN] Consultando ${relevantDates.length} fechas en bloques de concurrencia controlada`)
+  console.log(`[ESPN] Consultando ${relevantDates.length} fechas`)
 
-  const responses: { status: 'fulfilled'; value: { data: ESPNResponse | null; dateStr: string } }[] = []
-
-  // Concurrencia máxima controlada de 4 peticiones simultáneas
-  const chunkSize = 4
-  for (let i = 0; i < relevantDates.length; i += chunkSize) {
-    const chunk = relevantDates.slice(i, i + chunkSize)
-    const chunkPromises = chunk.map(async (d) => {
-      const isPast = d < todayStr
-      return fetchDateResults(d, isPast)
-    })
-    const chunkResults = await Promise.allSettled(chunkPromises)
-    for (const res of chunkResults) {
-      if (res.status === 'fulfilled') {
-        responses.push({
-          status: 'fulfilled',
-          value: res.value,
-        })
-      }
-    }
-  }
+  const responses = await Promise.allSettled(
+    relevantDates.map(d => fetchDateResults(d))
+  )
 
   const results: LiveResultsMap = {}
   const knockoutResults: KnockoutResultsMap = {}
