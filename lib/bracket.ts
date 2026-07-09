@@ -317,6 +317,27 @@ export function buildBracket(matches: Match[], knockoutResults: KnockoutResultsM
   const sfFilled = step4.current
   const finalFilled = step4.next
 
+  // Final y 3er puesto nunca son "currentRound" de un propagateRound (no hay
+  // ronda siguiente a la que empujar un ganador), así que su propio estado
+  // en vivo/finalizado nunca se calculaba — quedaban en 'pending' para
+  // siempre aunque ESPN ya reportara el partido en juego o terminado.
+  for (const match of finalFilled) {
+    if (!match.home.team || !match.away.team) continue
+    const result = resolveMatchResult(match.home.team, match.away.team, knockoutResults)
+    if (!result) continue
+    if (result.kind === 'live') {
+      match.home.score = result.homeScore
+      match.away.score = result.awayScore
+      match.status = 'live'
+      match.clock = result.clock
+    } else {
+      match.home.score = result.homeScore
+      match.away.score = result.awayScore
+      match.status = 'done'
+      match.clock = undefined
+    }
+  }
+
   // El 3er puesto lo juegan los PERDEDORES de semis, no los ganadores: hay que
   // resolverlo aparte, porque propagateRound solo empuja ganadores.
   for (const sfMatch of sfFilled) {

@@ -216,7 +216,10 @@ export async function fetchLiveResults(): Promise<FetchResultsOutput> {
       const actuallyLive = statusName === 'STATUS_IN_PROGRESS' ||
                            statusName === 'STATUS_FIRST_HALF' ||
                            statusName === 'STATUS_SECOND_HALF' ||
-                           statusName === 'STATUS_OVERTIME'
+                           statusName === 'STATUS_OVERTIME' ||
+                           statusName === 'STATUS_HALFTIME' // descanso — sigue "en vivo" (bug: antes hacía
+                                                             // `continue` más abajo y el partido volvía a
+                                                             // verse "pendiente" durante el entretiempo)
 
       if (!actuallyDone && !actuallyLive) continue
       if (ht.score === undefined || at.score === undefined) continue
