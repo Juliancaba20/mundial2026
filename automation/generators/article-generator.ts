@@ -59,8 +59,11 @@ Generá un JSON con este schema exacto (sin campos extra):
   "relatedTeamSlugs": ["array — slugs de equipos mencionados, SOLO de esta lista: ${validSlugs}. Array vacío [] si ninguno aplica"],
   "imageAlt": "string — descripción de imagen de estadio o ambiente del Mundial, SIN mencionar jugadores específicos",
   "imagePrompt": "string en INGLÉS — para generación de imagen. Describir estadio, banderas, ambiente. Sin jugadores, sin texto, sin marcadores",
-  "body": "string — artículo en Markdown, MÍNIMO 120 palabras. Usar ## para subtítulos, **negritas** para datos clave, listas con - cuando aplique. Si la fuente es escasa, completá con contexto general del torneo (sede, formato, grupos) pero NO inventés resultados ni declaraciones concretas."
+  "body": "string — artículo en Markdown, MÍNIMO 120 palabras. FORMATO OBLIGATORIO: cada párrafo, subtítulo, ítem de lista o cita DEBE estar en su propia línea, separado del anterior por una línea en blanco (carácter \\n\\n real dentro del string JSON). NUNCA vuelques todo el artículo en una sola línea. Usar ## para subtítulos (en su propia línea), **negritas** para datos clave, listas con - (una por línea) cuando aplique. Si la fuente es escasa, completá con contexto general del torneo (sede, formato, grupos) pero NO inventés resultados ni declaraciones concretas."
 }
+
+Ejemplo de la ESTRUCTURA esperada para el campo body (con saltos de línea reales, no literal el texto):
+"Primer párrafo de apertura con el dato principal.\\n\\n## Subtítulo\\n\\nSegundo párrafo desarrollando el tema.\\n\\n- Primer punto\\n- Segundo punto\\n\\n> Cita si corresponde"
 
 Respondé SOLO con el JSON. Sin backticks, sin texto antes ni después.`
 }
@@ -73,6 +76,43 @@ function sanitizeSlug(raw: string): string {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 60)
+}
+
+// ─── Normalización del body ───────────────────────────────────────────────────
+// Red de seguridad determinística: el LLM a veces devuelve el artículo entero
+// en una sola línea (con "##", "-" y ">" mezclados en el texto sin saltos de
+// línea reales), lo que rompe el render en ReactMarkdown (el heading se traga
+// todo el artículo). Esta función fuerza la estructura de bloques Markdown
+// independientemente de lo que haya devuelto el LLM.
+function normalizeMarkdownBody(raw: string): string {
+  let body = raw.trim()
+
+  // Si ya tiene separación real de bloques, solo normalizamos espaciados.
+  const hasBlankLines = /\n\s*\n/.test(body)
+
+  if (!hasBlankLines) {
+    // Todo vino en una sola línea (o sin dobles saltos). Insertamos línea en
+    // blanco antes de cada marcador de bloque para reconstituir la estructura.
+    body = body
+      // Antes de un heading "## " que no está al inicio del string.
+      .replace(/([^\n])\s+(#{1,6}\s)/g, '$1\n\n$2')
+      // Antes de un ítem de lista "- " que no está al inicio del string.
+      .replace(/([^\n])\s+(-\s+\S)/g, '$1\n\n$2')
+      // Antes de una cita "> " que no está al inicio del string.
+      .replace(/([^\n])\s+(>\s+\S)/g, '$1\n\n$2')
+  }
+
+  // Aunque ya tuviera saltos de línea, garantizamos que headings, listas y
+  // citas siempre queden separados del texto anterior por línea en blanco
+  // (por si el LLM puso un solo \n en vez de \n\n).
+  body = body
+    .replace(/([^\n])\n(#{1,6}\s)/g, '$1\n\n$2')
+    .replace(/([^\n])\n(>\s)/g, '$1\n\n$2')
+    // Colapsamos 3+ saltos de línea a 2 (una sola línea en blanco).
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+
+  return body
 }
 
 function parseJSON(raw: string): GeneratedArticle {
@@ -99,6 +139,19 @@ function validate(article: GeneratedArticle, slug: string): void {
   }
   article.relatedTeamSlugs = (article.relatedTeamSlugs ?? [])
     .filter(s => (CONFIG.teamSlugs as readonly string[]).includes(s))
+
+  // Punto 2: forzamos la estructura de bloques del body sin importar lo que
+  // haya devuelto el LLM.
+  article.body = normalizeMarkdownBody(article.body)
+
+  // Punto 3: si tras normalizar sigue sin tener bloques separados, es señal
+  // de que el heurístico no pudo reconstituir la estructura (ej. el LLM no
+  // usó ningún marcador de Markdown). Se registra pero no se bloquea el
+  // artículo — mejor publicarlo como texto corrido que perderlo.
+  const hasBlocks = /\n\s*\n/.test(article.body)
+  if (!hasBlocks) {
+    logger.warn(`Artículo ${slug}: el body no tiene estructura de bloques Markdown tras normalizar (posible párrafo único).`)
+  }
 }
 
 export async function generateArticle(
