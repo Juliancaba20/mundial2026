@@ -293,8 +293,13 @@ function SFtoFConnector({ sfMatches, finalMatch }: {
 // ─── Árbol desktop (scroll horizontal contenido) ──────────────────────────────
 function BracketTree({ bracket }: { bracket: BracketMatch[] }) {
   const byRound = (r: BracketRound) => bracket.filter(m => m.round === r)
-  const r32 = byRound('R32')
-  const r16 = byRound('R16')
+  // R32 y R16 deben reordenarse al orden visual del árbol (ver comentario junto
+  // a R32_VISUAL_ORDER/R16_VISUAL_ORDER más arriba): el orden de creación en
+  // lib/bracket.ts es el oficial FIFA, pero ConnectorLayer empareja por
+  // posición en el array (2i, 2i+1), no por nextMatchId. Sin este sort, las
+  // líneas del árbol conectaban partidos que no eran los padres reales.
+  const r32 = sortByVisualOrder(byRound('R32'), R32_VISUAL_ORDER)
+  const r16 = sortByVisualOrder(byRound('R16'), R16_VISUAL_ORDER)
   const qf  = byRound('QF')
   const sf  = byRound('SF')
   const finalMatch = bracket.find(m => m.round === 'F')

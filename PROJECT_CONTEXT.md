@@ -270,15 +270,27 @@ export function buildBracket(matches: Match[], knockoutResults: KnockoutResultsM
 - Propaga ganadores: R32→R16→QF→SF→Final
 - Si un partido no ha terminado, el slot del siguiente queda vacío (null)
 
-### BracketView.tsx
-- **Layout vertical único** — sin scroll horizontal, funciona igual en desktop, tablet y mobile
-- `BracketVerticalWithRefs` renderiza cada ronda como sección apilada verticalmente
-- `ROUND_COLS`: R32/R16/QF/SF → 2 columnas; F/3RD → 1 columna centrada
-- `ROUND_SCALE`: escala progresiva de cards (sm → xl) por ronda
-- Auto-scroll vertical a la ronda activa más avanzada usando `scrollIntoView`
-- Grid CSS responsive: colapsa a 1 columna en pantallas < 560px
-- Final con protagonismo visual especial (borde dorado, ícono 🏆, card xl centrada)
-- Tercer Puesto como sección independiente debajo de la Final
+### BracketView.tsx (reescrito a árbol horizontal — actualizado 9 jul 2026)
+**Nota:** este componente fue reescrito en algún momento posterior al layout vertical
+descripto originalmente acá (`BracketVerticalWithRefs`, `ROUND_COLS`, etc. — ya NO existen).
+La versión actual:
+- **Desktop (`brt-desktop`):** `BracketTree` — árbol horizontal con scroll (`brt-scroll-wrap`),
+  una columna por ronda (`RoundColumn`) conectada por `ConnectorLayer` (SVG con paths
+  dibujados a mano, coloreados en verde si el partido origen ya es `done`).
+- **Mobile (`brt-mobile`):** `BracketMobileTabs` — tabs por ronda (16avos/Octavos/.../Final),
+  auto-avanza a la ronda con partidos `pending`/`live` más próxima.
+- `ROUND_SCALE`: escala progresiva de cards (sm → xl) por ronda.
+- `calcTop()`/`treeHeight()`: posicionamiento absoluto de cada card dentro de su columna,
+  centrado según cuántos "padres" tiene (potencia de 2 según la ronda).
+- **`R32_VISUAL_ORDER`/`R16_VISUAL_ORDER` + `sortByVisualOrder()`:** reordenan R32/R16 SOLO
+  para el render (nunca tocan `id`/`nextMatchId` de `lib/bracket.ts`), porque
+  `ConnectorLayer` asume que el partido `i` de una ronda se alimenta de los partidos `2i` y
+  `2i+1` **por posición en el array**, no por `nextMatchId`. QF y SF no necesitan reordenarse.
+  **Crítico:** estos arrays deben estar tanto definidos como efectivamente aplicados en
+  `BracketTree` (`r32 = sortByVisualOrder(byRound('R32'), R32_VISUAL_ORDER)` y análogo para
+  r16) — ver bug #14, donde quedaron definidos pero sin usar y el bug reapareció.
+- `FinalColumn`: Final + 3er Puesto en la última columna, con estilos especiales.
+- `SFtoFConnector`: conector especial 2 SF → 1 Final.
 
 ### KnockoutResultsMap
 ```typescript
@@ -594,6 +606,29 @@ Actions) es `automation/`, no la raíz del repo.
   reflejando qué partido realmente alimenta a cuál — si no, el árbol vuelve a verse mal aunque
   los datos estén bien.
 
+**14. El fix del bug #12 quedó a medio aplicar — `sortByVisualOrder()` se definió pero
+  nunca se llamaba (9 jul 2026)**
+- **Síntoma:** el mismo problema del bug #12 (líneas del árbol conectando partidos que no se
+  cruzan en la realidad — ej. R16-1 "Canadá/Marruecos" con líneas apuntando a
+  Sudáfrica/Canadá y Alemania/Paraguay) seguía presente en producción, a pesar de que el
+  código ya tenía `R32_VISUAL_ORDER`, `R16_VISUAL_ORDER` y la función `sortByVisualOrder()`
+  escritos en `components/BracketView.tsx` con comentarios que describían la solución
+  correcta.
+- **Causa:** el bug #12 se documentó como resuelto, pero el fix nunca se terminó de cablear:
+  `BracketTree` seguía calculando `r32`/`r16` con `byRound('R32')`/`byRound('R16')` sin pasar
+  el resultado por `sortByVisualOrder()`. Es decir, la solución existía como código muerto —
+  definida pero jamás invocada — y el bug persistía exactamente igual que antes del "fix".
+- **Solución:** en `BracketTree`, `r32` y `r16` ahora se calculan como
+  `sortByVisualOrder(byRound('R32'), R32_VISUAL_ORDER)` y
+  `sortByVisualOrder(byRound('R16'), R16_VISUAL_ORDER)`. Se verificaron manualmente los 16
+  R32→R16 y los 8 R16→QF contra `nextMatchId`/`nextPosition` antes de aplicar el cambio — los
+  arrays `R32_VISUAL_ORDER`/`R16_VISUAL_ORDER` en sí estaban bien construidos, solo faltaba
+  usarlos. QF y SF no se tocaron (su orden de definición ya coincide con el orden visual).
+- **Regla para el futuro:** cuando un bug se documenta como "resuelto" citando una función
+  nueva (ej. `sortByVisualOrder`), verificar SIEMPRE que esa función se esté llamando de
+  verdad en el flujo de render, no solo que exista en el archivo. "El código para el fix
+  existe" no es lo mismo que "el fix está aplicado".
+
 **13. La home mostraba partidos del principio del torneo en vez de "hoy"/"en vivo" (5 jul 2026)**
 - **Síntoma:** en la página principal, tanto el partido destacado como el strip de partidos
   seguían mostrando partidos de fase de grupos de las primeras fechas del torneo, en vez del
@@ -703,7 +738,7 @@ npm run build
 | `automation/config.ts` | Define `ROOT_DIR`. Si se rompe, todo el pipeline de noticias escribe/commitea en la carpeta equivocada (ver bug histórico #7 en "Sistema de noticias automatizado") |
 | `automation/git/index.ts` | Comandos git deben correr con `cwd: ROOT_DIR`, nunca con el cwd por defecto |
 | `.github/workflows/auto-news.yml` | Define `working-directory: automation` — cualquier ruta nueva en `automation/` debe resolverse vía `ROOT_DIR`, no `process.cwd()` |
-| `components/BracketView.tsx` | `R32_VISUAL_ORDER`/`R16_VISUAL_ORDER` deben reflejar los cruces reales de `lib/bracket.ts` — si se desincronizan, el árbol dibuja líneas conectoras a los partidos equivocados aunque los datos estén bien (ver bug #12) |
+| `components/BracketView.tsx` | `R32_VISUAL_ORDER`/`R16_VISUAL_ORDER` deben reflejar los cruces reales de `lib/bracket.ts` **y** aplicarse de verdad vía `sortByVisualOrder()` dentro de `BracketTree` — si se desincronizan o si el sort deja de llamarse, el árbol dibuja líneas conectoras a los partidos equivocados aunque los datos estén bien (ver bugs #12 y #14) |
 | `components/MatchesClient.tsx` | `buildFeaturedPool()` es lo único que hace que la home muestre "hoy"/"en vivo" en eliminatorias — no reemplazar por iterar `BASE_MATCHES` solo (ver bug #13) |
 
 ---
@@ -779,6 +814,11 @@ npx tsc --noEmit && npm run build
 
 ---
 
-*Última actualización: 5 jul 2026 (fix `resolveMatchResult()` con `winner` de ESPN, fix líneas conectoras del árbol de eliminatorias, fix home mostrando partidos viejos en vez de "hoy"/"en vivo", migración de 45 noticias huérfanas, fix grilla de noticias, fix marquee de la home a un objetivo fijo de 6 partidos)*
+*Última actualización: 9 jul 2026 (fix real de las líneas conectoras del árbol de
+eliminatorias — bug #14: `sortByVisualOrder()` estaba definida pero nunca se llamaba en
+`BracketTree`; ahora `r32`/`r16` se ordenan de verdad antes de pasar por `ConnectorLayer`.
+Se corrigió además la descripción desactualizada de `BracketView.tsx` en este documento, que
+todavía describía un layout vertical (`BracketVerticalWithRefs`) reemplazado hace tiempo por
+el árbol horizontal actual con `ConnectorLayer`/`BracketMobileTabs`.)*
 *Repo: https://github.com/Juliancaba20/mundial2026*
 *Producción: https://mundial2026-blond-pi.vercel.app*
