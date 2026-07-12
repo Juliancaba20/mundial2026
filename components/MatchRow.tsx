@@ -14,9 +14,17 @@ interface Props {
 
 export function MatchRow({ match: m, showGroup = true }: Props) {
   const router = useRouter()
-  
+  const matchHref = `/partidos/${m.id}`
+
   const handleRowClick = () => {
-    router.push(`/partidos/${m.id}`)
+    router.push(matchHref)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      router.push(matchHref)
+    }
   }
 
   const scoreEl = m.status === 'live'
@@ -33,6 +41,11 @@ export function MatchRow({ match: m, showGroup = true }: Props) {
       whileHover={{ y: -2, scale: 1.005, borderColor: 'rgba(255, 255, 255, 0.14)' }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
       onClick={handleRowClick}
+      onKeyDown={handleKeyDown}
+      onMouseEnter={() => router.prefetch(matchHref)}
+      role="link"
+      tabIndex={0}
+      aria-label={`Ver detalle: ${m.home.name} vs ${m.away.name}`}
       style={{ cursor: 'pointer' }}
       className={[
         'match-row',

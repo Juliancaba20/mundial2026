@@ -13,21 +13,32 @@ export function MatchAnalysisClient({ matchId }: Props) {
   const [analysis, setAnalysis] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [pendingCrossover, setPendingCrossover] = useState<string | null>(null)
   const [key, setKey] = useState(0) // used to trigger re-fetch and animation
 
   useEffect(() => {
     let active = true
 
-    async function fetchAnalysis() {
+    async function fetchAnalysis(forceRegenerate: boolean) {
       try {
-        const res = await fetch(`/api/partidos/${matchId}/analysis`)
+        const url = `/api/partidos/${matchId}/analysis${forceRegenerate ? '?regenerate=1' : ''}`
+        const res = await fetch(url)
+        const data = await res.json()
         if (!res.ok) {
-          const data = await res.json()
+          // 409: el cruce todavía no tiene ambos equipos definidos (bracket
+          // sin resolver). No es un error real, es un estado informativo.
+          if (res.status === 409) {
+            if (active) {
+              setPendingCrossover(data.error)
+              setLoading(false)
+            }
+            return
+          }
           throw new Error(data.error || 'Error al generar el análisis')
         }
-        const data = await res.json()
         if (active) {
           setAnalysis(data.analysis)
+          setPendingCrossover(null)
           setLoading(false)
         }
       } catch (err: unknown) {
@@ -39,7 +50,7 @@ export function MatchAnalysisClient({ matchId }: Props) {
       }
     }
 
-    fetchAnalysis()
+    fetchAnalysis(key > 0)
 
     return () => {
       active = false
@@ -63,7 +74,7 @@ export function MatchAnalysisClient({ matchId }: Props) {
           <span className="ach-title">SISTEMA DE ANÁLISIS GEMINI</span>
           <span className="ach-badge">IA ACTIVA</span>
         </div>
-        {!loading && !error && (
+        {!loading && !error && !pendingCrossover && (
           <button onClick={handleRegenerate} className="ach-reload-btn" title="Regenerar análisis">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}>
               <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
@@ -96,6 +107,27 @@ export function MatchAnalysisClient({ matchId }: Props) {
               <div className="skeleton-row skeleton-title" style={{ marginTop: 24 }} />
               <div className="skeleton-row" style={{ width: '90%' }} />
               <div className="skeleton-row" style={{ width: '80%' }} />
+            </div>
+          </motion.div>
+        )}
+
+        {!loading && pendingCrossover && !error && (
+          <motion.div
+            key="pending-crossover"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="analysis-pending-pane"
+          >
+            <div className="pending-icon-box">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v6l4 2" />
+              </svg>
+            </div>
+            <div className="pending-details">
+              <h4>Análisis disponible próximamente</h4>
+              <p>{pendingCrossover}</p>
             </div>
           </motion.div>
         )}
@@ -153,7 +185,6 @@ export function MatchAnalysisClient({ matchId }: Props) {
           border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 12px;
           overflow: hidden;
-          margin-top: 24px;
           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
         }
 
@@ -300,6 +331,32 @@ export function MatchAnalysisClient({ matchId }: Props) {
         @keyframes loading-shimmer {
           0% { background-position: 200% 0; }
           100% { background-position: -200% 0; }
+        }
+
+        .analysis-pending-pane {
+          padding: 36px 24px;
+          display: flex;
+          gap: 16px;
+          background: rgba(255, 255, 255, 0.02);
+        }
+
+        .pending-icon-box {
+          color: #7D8590;
+          flex-shrink: 0;
+        }
+
+        .pending-details h4 {
+          font-size: 15px;
+          font-weight: 600;
+          color: #E6EDF3;
+          margin-bottom: 6px;
+        }
+
+        .pending-details p {
+          font-size: 13px;
+          color: #7D8590;
+          margin-bottom: 0;
+          line-height: 1.5;
         }
 
         .analysis-error-pane {

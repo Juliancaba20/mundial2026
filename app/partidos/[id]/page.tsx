@@ -1,33 +1,39 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { fetchLiveResults, applyResults } from '@/lib/espn'
 import { BASE_MATCHES } from '@/lib/data'
 import { buildBracket } from '@/lib/bracket'
 import { calculateStandings } from '@/lib/standings'
 import { TeamFlag } from '@/components/TeamFlag'
 import { MatchAnalysisClient } from '@/components/MatchAnalysisClient'
+import {
+  ROUND_NAMES,
+  getAllMatchesData,
+  findMatchById,
+  getTeamRefs,
+  getMatchScoreText,
+  getPhaseLabel,
+  getStadiumInfo,
+} from '@/lib/matches'
 
 interface Props {
   params: Promise<{ id: string }>
 }
 
-const ROUND_NAMES: Record<string, string> = {
-  'R32': 'Dieciseisavos de Final',
-  'R16': 'Octavos de Final',
-  'QF': 'Cuartos de Final',
-  'SF': 'Semifinales',
-  'F': 'Gran Final',
-  '3RD': 'Tercer Puesto'
+// Pre-renderiza los 104 partidos conocidos del torneo (48 de grupos + 56 de
+// eliminatorias) en build time. El bracket estructural (ids, rondas, fechas)
+// es fijo independientemente del resultado en vivo, por lo que no necesita
+// datos de ESPN para generarse — evita depender de la red en build.
+export async function generateStaticParams() {
+  const structuralBracket = buildBracket(BASE_MATCHES, {})
+  const ids = [...BASE_MATCHES, ...structuralBracket].map(m => ({ id: m.id }))
+  return ids
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
-  const { results, knockoutResults } = await fetchLiveResults()
-  const groupMatches = applyResults(BASE_MATCHES, results)
-  const bracketMatches = buildBracket(groupMatches, knockoutResults)
-  const allMatches = [...groupMatches, ...bracketMatches]
-  const match = allMatches.find(m => m.id === id)
+  const { allMatches } = await getAllMatchesData()
+  const match = findMatchById(allMatches, id)
 
   if (!match) {
     return {
@@ -35,35 +41,42 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   }
 
-  const homeTeamRef = 'team' in match.home ? match.home.team : match.home
-  const awayTeamRef = 'team' in match.away ? match.away.team : match.away
-
+  const { home: homeTeamRef, away: awayTeamRef } = getTeamRefs(match)
   const homeName = homeTeamRef?.name ?? 'Por definir'
   const awayName = awayTeamRef?.name ?? 'Por definir'
+  const roundName = getPhaseLabel(match)
+  const title = `${homeName} vs ${awayName} - ${roundName} - Mundial 2026`
+  const description = `Detalles, resultado en vivo, estadísticas y análisis táctico de inteligencia artificial Gemini para el partido de ${homeName} vs ${awayName} en el Mundial 2026.`
 
-  const roundName = 'group' in match ? `Grupo ${match.group}` : (ROUND_NAMES[match.round] || match.round)
   return {
-    title: `${homeName} vs ${awayName} - ${roundName} - Mundial 2026`,
-    description: `Detalles, resultado en vivo, estadísticas y análisis táctico de inteligencia artificial Gemini para el partido de ${homeName} vs ${awayName} en el Mundial 2026.`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      locale: 'es_AR',
+    },
+    twitter: {
+      card: 'summary',
+      title,
+      description,
+    },
   }
 }
 
 export default async function PartidoDetailPage({ params }: Props) {
   const { id } = await params
-  
-  // Real-time server side data loading
-  const { results, knockoutResults } = await fetchLiveResults()
-  const groupMatches = applyResults(BASE_MATCHES, results)
-  const bracketMatches = buildBracket(groupMatches, knockoutResults)
-  const allMatches = [...groupMatches, ...bracketMatches]
 
-  const match = allMatches.find(m => m.id === id)
+  // Real-time server side data loading (cacheado por request con React.cache)
+  const { groupMatches, allMatches } = await getAllMatchesData()
+
+  const match = findMatchById(allMatches, id)
   if (!match) {
     notFound()
   }
 
-  const homeTeamRef = 'team' in match.home ? match.home.team : match.home
-  const awayTeamRef = 'team' in match.away ? match.away.team : match.away
+  const { home: homeTeamRef, away: awayTeamRef } = getTeamRefs(match)
 
   const homeName = homeTeamRef?.name ?? 'Por definir'
   const awayName = awayTeamRef?.name ?? 'Por definir'
@@ -75,15 +88,6 @@ export default async function PartidoDetailPage({ params }: Props) {
   const isLive = match.status === 'live'
   const isDone = match.status === 'done'
 
-  const getMatchScoreText = (m: any): string | undefined => {
-    if ('score' in m) {
-      return m.score
-    }
-    if (m.home?.score !== undefined && m.away?.score !== undefined) {
-      return `${m.home.score} – ${m.away.score}`
-    }
-    return undefined
-  }
   const matchScore = getMatchScoreText(match)
   const scoreText = match.status === 'pending' ? null : matchScore
   const isGroupPhase = !('round' in match)
@@ -97,8 +101,7 @@ export default async function PartidoDetailPage({ params }: Props) {
   }
 
   // Extract stadium name if not present
-  const fullStadium = ('stadium' in match ? match.stadium : null) || 'Estadio de Eliminatorias'
-  const locationLabel = ('city' in match ? match.city : null) || ('venue' in match ? match.venue : null) || 'Sede del Encuentro'
+  const { stadium: fullStadium, location: locationLabel } = getStadiumInfo(match)
 
   // If group phase, calculate current standings for this group
   const groupStandings = isGroupPhase && ('group' in match) ? calculateStandings(match.group, groupMatches) : []
@@ -127,8 +130,34 @@ export default async function PartidoDetailPage({ params }: Props) {
     ? `Fase de Grupos · Grupo ${match.group}` 
     : `Eliminatorias directas · ${ROUND_NAMES[match.round] || match.round}`
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SportsEvent',
+    name: `${homeName} vs ${awayName}`,
+    startDate: match.kickoff || undefined,
+    eventStatus: isDone
+      ? 'https://schema.org/EventScheduled'
+      : isLive
+      ? 'https://schema.org/EventScheduled'
+      : 'https://schema.org/EventScheduled',
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    location: {
+      '@type': 'Place',
+      name: fullStadium,
+      address: locationLabel,
+    },
+    competitor: [
+      { '@type': 'SportsTeam', name: homeName },
+      { '@type': 'SportsTeam', name: awayName },
+    ],
+  }
+
   return (
     <div className="content-area">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Botón de retroceso modernizado con estilo premium */}
       <div className="mb-6">
         <Link 
@@ -272,16 +301,19 @@ export default async function PartidoDetailPage({ params }: Props) {
         </div>
       </section>
 
-      {/* Contenido en dos columnas */}
+      {/* Contenido en dos columnas.
+          En mobile, la ficha/tabla (más rápida de escanear) va primero y el
+          análisis de IA (más pesado de leer) va después; en desktop mantienen
+          el orden visual original de dos columnas lado a lado. */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8 items-start">
-        
-        {/* Columna Izquierda: Gemini AI Analysis (Con márgenes óptimos) */}
-        <div className="overflow-hidden mt-[-24px]">
+
+        {/* Columna Izquierda: Gemini AI Analysis */}
+        <div className="overflow-hidden order-2 lg:order-1">
           <MatchAnalysisClient matchId={match.id} />
         </div>
 
         {/* Columna Derecha: Información de contexto del torneo */}
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 order-1 lg:order-2">
           
           {/* Si es Fase de Grupos: Tabla de Posiciones Cohesiva */}
           {isGroupPhase && groupStandings.length > 0 && (

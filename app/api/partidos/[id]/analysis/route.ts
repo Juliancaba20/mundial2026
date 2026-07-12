@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenAI } from '@google/genai'
-import { fetchLiveResults, applyResults } from '@/lib/espn'
-import { BASE_MATCHES, TEAMS } from '@/lib/data'
-import { buildBracket } from '@/lib/bracket'
-import { Match, BracketMatch } from '@/types'
+import { TEAMS } from '@/lib/data'
+import {
+  getAllMatchesData,
+  findMatchById,
+  getTeamRefs,
+  hasUndefinedTeams,
+  getMatchScoreText,
+  getPhaseLabel,
+  getStadiumInfo,
+} from '@/lib/matches'
+import { buildAnalysisCacheKey, getCachedAnalysis, setCachedAnalysis } from '@/lib/analysisCache'
 
 // Initialize the GoogleGenAI client on the server side
 const ai = new GoogleGenAI({
@@ -21,7 +28,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    
+
     // Check if API key is configured
     if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json(
@@ -30,13 +37,9 @@ export async function GET(
       )
     }
 
-    // Fetch the latest real-time scores
-    const { results, knockoutResults } = await fetchLiveResults()
-    const groupMatches = applyResults(BASE_MATCHES, results)
-    const bracketMatches = buildBracket(groupMatches, knockoutResults)
-    const allMatches = [...groupMatches, ...bracketMatches]
-
-    const match = allMatches.find(m => m.id === id)
+    // Fetch the latest real-time scores (pipeline cacheado por request)
+    const { allMatches } = await getAllMatchesData()
+    const match = findMatchById(allMatches, id)
     if (!match) {
       return NextResponse.json(
         { error: 'Partido no encontrado.' },
@@ -44,9 +47,29 @@ export async function GET(
       )
     }
 
+    // Guard: si el cruce todavía no está definido (bracket sin resolver), no
+    // tiene sentido pedirle a Gemini un análisis táctico de dos equipos
+    // "Por definir" — es gasto de cuota sin valor real para el usuario.
+    if (hasUndefinedTeams(match)) {
+      return NextResponse.json(
+        { error: 'El análisis estará disponible cuando se conozcan ambos equipos de este cruce.' },
+        { status: 409 }
+      )
+    }
+
+    const matchScore = getMatchScoreText(match)
+
+    // Caché: evita regenerar el mismo análisis en cada visita. Se invalida
+    // automáticamente cuando cambia el estado o el marcador del partido.
+    const cacheKey = buildAnalysisCacheKey(match.id, match.status, matchScore)
+    const cached = getCachedAnalysis(cacheKey)
+    const forceRegenerate = req.nextUrl.searchParams.get('regenerate') === '1'
+    if (cached && !forceRegenerate) {
+      return NextResponse.json({ analysis: cached, cached: true })
+    }
+
     // Retrieve teams additional metadata from TEAMS array safely
-    const homeTeamRef = 'team' in match.home ? match.home.team : match.home
-    const awayTeamRef = 'team' in match.away ? match.away.team : match.away
+    const { home: homeTeamRef, away: awayTeamRef } = getTeamRefs(match)
 
     const homeName = homeTeamRef?.name ?? 'Por definir'
     const awayName = awayTeamRef?.name ?? 'Por definir'
@@ -70,21 +93,8 @@ export async function GET(
       timeZone: 'America/Argentina/Buenos_Aires'
     }) : match.date
 
-    const isGroupPhase = !('round' in match)
-    const phaseLabel = 'group' in match ? `Grupo ${match.group}` : (match.round === 'F' ? 'Final' : match.round === 'SF' ? 'Semifinal' : match.round === 'QF' ? 'Cuartos de Final' : match.round === 'R16' ? 'Octavos de Final' : match.round === 'R32' ? 'Dieciseisavos de Final' : 'Tercer Puesto')
-    const stadiumName = 'stadium' in match ? match.stadium : 'Estadio de Eliminatorias'
-    const cityName = 'city' in match ? match.city : ('venue' in match ? match.venue : 'Sede')
-
-    const getMatchScoreText = (m: any): string | undefined => {
-      if ('score' in m) {
-        return m.score
-      }
-      if (m.home?.score !== undefined && m.away?.score !== undefined) {
-        return `${m.home.score} - ${m.away.score}`
-      }
-      return undefined
-    }
-    const matchScore = getMatchScoreText(match)
+    const phaseLabel = getPhaseLabel(match)
+    const { stadium: stadiumName, location: cityName } = getStadiumInfo(match)
 
     // Construct the prompt context based on match state
     let matchContext = `
@@ -148,7 +158,9 @@ Brinda una breve crónica y un resumen de las sensaciones futbolísticas que dej
 
     const text = response.text || 'No se pudo generar el análisis.'
 
-    return NextResponse.json({ analysis: text })
+    setCachedAnalysis(cacheKey, text)
+
+    return NextResponse.json({ analysis: text, cached: false })
   } catch (error: unknown) {
     console.error('[GEMINI_ANALYSIS_ERROR]', error)
     const errMsg = error instanceof Error ? error.message : String(error)

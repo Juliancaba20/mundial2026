@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 import type { Match, BracketMatch, BracketRound, LiveResultsMap, KnockoutResultsMap } from '@/types'
 import { BASE_MATCHES } from '@/lib/data'
 import { buildBracket, ROUND_LABELS, ROUND_DATES } from '@/lib/bracket'
@@ -8,6 +9,11 @@ import { MatchRow } from './MatchRow'
 import { BracketMatchRow } from './BracketMatchRow'
 import { TeamFlag } from './TeamFlag'
 import { motion } from 'motion/react'
+
+// Versión animable de next/link — reemplaza los <a href> planos que se usaban
+// antes (causaban recarga completa de página en cada clic, perdiendo el
+// ruteo cliente de Next y el prefetch) manteniendo las mismas animaciones.
+const MotionLink = motion.create(Link)
 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -448,7 +454,7 @@ function HeroCard({ m }: { m: Match }) {
   const groupLabel = m.group.length === 1 ? `Grupo ${m.group}` : m.group
 
   return (
-    <motion.a
+    <MotionLink
       initial={{ opacity: 0, scale: 0.98, y: 10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       whileHover={{ y: -4, scale: 1.005 }}
@@ -492,7 +498,7 @@ function HeroCard({ m }: { m: Match }) {
       </div>
 
       <div className="mh-venue">{m.venue}</div>
-    </motion.a>
+    </MotionLink>
   )
 }
 
@@ -532,7 +538,7 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
               : <div className={`fm-score-center${m.status === 'live' ? ' live' : ''}`}>{m.score}</div>
 
             return (
-              <motion.a
+              <MotionLink
                 key={m.id}
                 initial={{ opacity: 0, y: 12 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -560,7 +566,7 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
                   </div>
                 </div>
                 <div className="fm-venue">{m.venue}</div>
-              </motion.a>
+              </MotionLink>
             )
           })}
         </div>
@@ -640,7 +646,7 @@ export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }
         <div className="marquee-container">
           <div className="marquee-content" style={{ animationDuration: `${toShow.length * 5}s` }}>
             {marqueeItems.map((m, idx) => (
-              <motion.a
+              <MotionLink
                 key={`${m.id}-${idx}`}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -660,7 +666,7 @@ export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }
                   <TeamFlag code={m.away.flagCode} name={m.away.name} size={18} className="hm-flag-img" />
                   <span className="hm-name">{m.away.name}</span>
                 </div>
-              </motion.a>
+              </MotionLink>
             ))}
           </div>
         </div>
