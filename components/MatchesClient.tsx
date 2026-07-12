@@ -454,7 +454,7 @@ function HeroCard({ m }: { m: Match }) {
       whileHover={{ y: -4, scale: 1.005 }}
       whileTap={{ scale: 0.995 }}
       transition={{ duration: 0.5, ease: 'easeOut' }}
-      href="/partidos"
+      href={`/partidos/${m.id}`}
       className={`match-hero-card${isLive ? ' is-live' : ''}${isDone ? ' is-done-hero' : ''}`}
       style={{ textDecoration: 'none', display: 'block' }}
     >
@@ -540,7 +540,7 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
                 whileHover={{ y: -4, scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
                 transition={{ duration: 0.4, ease: 'easeOut' }}
-                href="/partidos"
+                href={`/partidos/${m.id}`}
                 className={`fm-card${m.status === 'live' ? ' is-live' : ''}${m.status === 'done' ? ' is-done-card' : ''}`}
                 style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column' }}
               >
@@ -644,7 +644,7 @@ export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }
                 key={`${m.id}-${idx}`}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                href="/partidos"
+                href={`/partidos/${m.id}`}
                 className={`hm-card${m.status === 'live' ? ' active-live' : ''}`}
                 style={{ textDecoration: 'none' }}
               >

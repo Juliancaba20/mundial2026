@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { Match } from '@/types'
 import { MatchTime } from './MatchTime'
 import { TeamFlag } from './TeamFlag'
@@ -12,6 +13,12 @@ interface Props {
 }
 
 export function MatchRow({ match: m, showGroup = true }: Props) {
+  const router = useRouter()
+  
+  const handleRowClick = () => {
+    router.push(`/partidos/${m.id}`)
+  }
+
   const scoreEl = m.status === 'live'
     ? <div className="m-score-box live-s">{m.score}</div>
     : m.status === 'done'
@@ -25,6 +32,8 @@ export function MatchRow({ match: m, showGroup = true }: Props) {
       viewport={{ once: true, margin: '-20px' }}
       whileHover={{ y: -2, scale: 1.005, borderColor: 'rgba(255, 255, 255, 0.14)' }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
+      onClick={handleRowClick}
+      style={{ cursor: 'pointer' }}
       className={[
         'match-row',
         m.isArgentina  ? 'arg'     : '',
@@ -39,12 +48,12 @@ export function MatchRow({ match: m, showGroup = true }: Props) {
       {/* Equipos + score */}
       <div className="m-main">
         <div className="m-teams">
-          <Link href={`/equipo/${m.home.slug}`} className="m-team">
+          <Link href={`/equipo/${m.home.slug}`} className="m-team" onClick={(e) => e.stopPropagation()}>
             <TeamFlag code={m.home.flagCode} name={m.home.name} size={18} className="m-flag-img" />
             <span className="m-tname">{m.home.name}</span>
           </Link>
           {scoreEl}
-          <Link href={`/equipo/${m.away.slug}`} className="m-team right">
+          <Link href={`/equipo/${m.away.slug}`} className="m-team right" onClick={(e) => e.stopPropagation()}>
             <TeamFlag code={m.away.flagCode} name={m.away.name} size={18} className="m-flag-img" />
             <span className="m-tname">{m.away.name}</span>
           </Link>

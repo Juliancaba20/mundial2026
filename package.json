@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@google/genai": "^2.11.0",
     "flag-icons": "^7.5.0",
     "gray-matter": "^4.0.3",
     "motion": "^12.42.2",

@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import type { BracketMatch, BracketSlot } from '@/types'
 import { TeamFlag } from './TeamFlag'
 import { MatchTime } from './MatchTime'
@@ -36,11 +37,16 @@ interface Props {
 }
 
 export function BracketMatchRow({ match: m, roundLabel }: Props) {
+  const router = useRouter()
   const isLive = m.status === 'live'
   const isDone = m.status === 'done'
   const isPending = m.status === 'pending'
   const isFinal = m.round === 'F'
   const isThird = m.round === '3RD'
+
+  const handleRowClick = () => {
+    router.push(`/partidos/${m.id}`)
+  }
 
   // Score desde los slots (bracket lo almacena ahí)
   const homeScore = m.home.score
@@ -75,6 +81,8 @@ export function BracketMatchRow({ match: m, roundLabel }: Props) {
       viewport={{ once: true, margin: '-20px' }}
       whileHover={{ y: -2, scale: 1.005, borderColor: 'rgba(255, 255, 255, 0.14)' }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
+      onClick={handleRowClick}
+      style={{ cursor: 'pointer' }}
       className={rowClass}
     >
       {/* Etiqueta de ronda (opcional) */}
