@@ -65,6 +65,91 @@ function buildFeaturedPool(
   )
 }
 
+let globalMatches: Match[] = []
+const globalListeners: Set<(m: Match[]) => void> = new Set()
+let globalIsFetching = false
+
+function subscribeToGlobalMatches(listener: (m: Match[]) => void) {
+  globalListeners.add(listener)
+  return () => {
+    globalListeners.delete(listener)
+  }
+}
+
+function updateGlobalMatches(newMatches: Match[]) {
+  globalMatches = newMatches
+  for (const listener of globalListeners) {
+    listener(newMatches)
+  }
+}
+
+function useGlobalMatches(initialMatches: Match[]): Match[] {
+  const [matches, setMatches] = useState<Match[]>(() => {
+    return globalMatches.length ? globalMatches : initialMatches
+  })
+
+  useEffect(() => {
+    const unsubscribe = subscribeToGlobalMatches(setMatches)
+    
+    if (!globalMatches.length) {
+      globalMatches = initialMatches
+    }
+    
+    const fetchAndUpdate = async () => {
+      if (globalIsFetching) return
+      globalIsFetching = true
+      try {
+        const res = await fetch('/api/resultados', { cache: 'no-store' })
+        if (res.ok) {
+          const data: { results: LiveResultsMap; knockoutResults?: KnockoutResultsMap } = await res.json()
+          const pool = buildFeaturedPool(initialMatches, data.results ?? {}, data.knockoutResults ?? {})
+          updateGlobalMatches(pool)
+        }
+      } catch (err) {
+        console.error('Error fetching global results:', err)
+      } finally {
+        globalIsFetching = false
+      }
+    }
+
+    if (globalMatches === initialMatches) {
+      fetchAndUpdate()
+    }
+
+    const intervalId = setInterval(fetchAndUpdate, 60_000)
+
+    return () => {
+      unsubscribe()
+      clearInterval(intervalId)
+    }
+  }, [initialMatches])
+
+  return matches
+}
+
+function getFeaturedMatchIds(matches: Match[]): Set<string> {
+  const ids = new Set<string>()
+  const live = matches.filter(m => m.status === 'live')
+  const done = matches.filter(m => m.status === 'done')
+  const upcoming = matches.filter(m => m.status === 'pending')
+
+  const hero = live[0] ?? upcoming[0] ?? done[done.length - 1] ?? null
+  if (hero) ids.add(hero.id)
+
+  const secondary = matches
+    .filter(m => m.id !== hero?.id)
+    .filter(m => {
+      if (live.length) return m.status === 'live' || m.status === 'pending'
+      return m.status === 'pending' || m.status === 'done'
+    })
+    .slice(0, 5)
+
+  for (const m of secondary) {
+    ids.add(m.id)
+  }
+  return ids
+}
+
 function getLocalDateLabel(kickoff: string): string {
   const d = new Date(kickoff)
   if (isNaN(d.getTime())) return ''
@@ -413,24 +498,7 @@ function HeroCard({ m }: { m: Match }) {
 
 // ── Partido héroe + cards secundarias para la home ───────────────────────────
 export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Match[] }) {
-  const [matches, setMatches] = useState<Match[]>(initialMatches)
-
-  const fetchAndUpdate = useCallback(async () => {
-    try {
-      const res = await fetch('/api/resultados', { cache: 'no-store' })
-      if (!res.ok) return
-      const data: { results: LiveResultsMap; knockoutResults?: KnockoutResultsMap } = await res.json()
-      setMatches(buildFeaturedPool(initialMatches, data.results ?? {}, data.knockoutResults ?? {}))
-    } catch { /* mantiene datos actuales */ }
-  }, [initialMatches])
-
-  useEffect(() => {
-    setTimeout(() => {
-      fetchAndUpdate()
-    }, 0)
-    const id = setInterval(fetchAndUpdate, 60_000)
-    return () => clearInterval(id)
-  }, [fetchAndUpdate])
+  const matches = useGlobalMatches(initialMatches)
 
   const live = matches.filter(m => m.status === 'live')
   const done = matches.filter(m => m.status === 'done')
@@ -503,29 +571,17 @@ export function FeaturedMatchesClient({ initialMatches }: { initialMatches: Matc
 
 // ── Strip de partidos para el hero ───────────────────────────────────────────
 export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }) {
-  const [matches, setMatches] = useState<Match[]>(initialMatches)
-
-  const fetchAndUpdateStrip = useCallback(async () => {
-    try {
-      const res = await fetch('/api/resultados', { cache: 'no-store' })
-      if (!res.ok) return
-      const data: { results: LiveResultsMap; knockoutResults?: KnockoutResultsMap } = await res.json()
-      setMatches(buildFeaturedPool(initialMatches, data.results ?? {}, data.knockoutResults ?? {}))
-    } catch { /* mantiene datos actuales */ }
-  }, [initialMatches])
-
-  useEffect(() => {
-    setTimeout(() => {
-      fetchAndUpdateStrip()
-    }, 0)
-    const id = setInterval(fetchAndUpdateStrip, 60_000)
-    return () => clearInterval(id)
-  }, [fetchAndUpdateStrip])
+  const matches = useGlobalMatches(initialMatches)
 
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-  const live = matches.filter(m => m.status === 'live')
-  const doneSorted = matches.filter(m => m.status === 'done')       // orden ascendente por kickoff
-  const pendingSorted = matches.filter(m => m.status === 'pending') // orden ascendente por kickoff
+  
+  // Excluir los partidos destacados que aparecen abajo para evitar repeticiones
+  const featuredIds = getFeaturedMatchIds(matches)
+  const nonDuplicatedMatches = matches.filter(m => !featuredIds.has(m.id))
+
+  const live = nonDuplicatedMatches.filter(m => m.status === 'live')
+  const doneSorted = nonDuplicatedMatches.filter(m => m.status === 'done')       // orden ascendente por kickoff
+  const pendingSorted = nonDuplicatedMatches.filter(m => m.status === 'pending') // orden ascendente por kickoff
 
   // Objetivo: mostrar siempre 6 partidos (mezcla de los últimos jugados y los
   // próximos), no solo "los de hoy" — antes, si hoy había 2 partidos, el
@@ -537,8 +593,8 @@ export function MatchStripClient({ initialMatches }: { initialMatches: Match[] }
     toShow = live
   } else {
     const remaining = TARGET - live.length
-    let wantUpcoming = Math.ceil(remaining / 2)
-    let wantRecent = remaining - wantUpcoming
+    const wantUpcoming = Math.ceil(remaining / 2)
+    const wantRecent = remaining - wantUpcoming
     let upcomingPart = pendingSorted.slice(0, wantUpcoming)
     let recentPart = doneSorted.slice(Math.max(0, doneSorted.length - wantRecent))
     const short = remaining - upcomingPart.length - recentPart.length

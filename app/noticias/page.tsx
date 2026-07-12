@@ -18,7 +18,6 @@ export const metadata: Metadata = {
 
 export default function NoticiasPage() {
   const noticias = getAllNoticias()
-  const [destacada, ...resto] = noticias
 
   return (
     <div className="content-area">
@@ -39,21 +38,12 @@ export default function NoticiasPage() {
         </div>
       ) : (
         <>
-          {/* Destacada arriba (primera por fecha) */}
-          {destacada && (
-            <div className="news-grid news-grid-index" style={{ marginBottom: 12 }}>
-              <NoticiaCard noticia={destacada} featured />
-            </div>
-          )}
-
-          {/* Resto en grid de 3 columnas */}
-          {resto.length > 0 && (
-            <div className="news-grid news-grid-index">
-              {resto.map((n) => (
-                <NoticiaCard key={n.slug} noticia={n} />
-              ))}
-            </div>
-          )}
+          {/* Todas las noticias en un único grid de 5 columnas en desktop */}
+          <div className="news-grid news-grid-index">
+            {noticias.map((n) => (
+              <NoticiaCard key={n.slug} noticia={n} />
+            ))}
+          </div>
 
           <div style={{ marginTop: 40 }}>
             <Link href="/" className="back-link">

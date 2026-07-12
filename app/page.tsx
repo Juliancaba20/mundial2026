@@ -15,8 +15,8 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   const featuredTeams = FEATURED_TEAM_SLUGS.map(s => TEAMS_BY_SLUG[s]).filter(Boolean)
-  // Las 4 noticias más recientes (orden desc por fecha desde lib/noticias).
-  const noticiasHome = getAllNoticias().slice(0, 4)
+  // Las 5 noticias más recientes (orden desc por fecha desde lib/noticias).
+  const noticiasHome = getAllNoticias().slice(0, 5)
 
   return (
     <>
