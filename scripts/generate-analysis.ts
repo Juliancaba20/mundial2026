@@ -66,8 +66,16 @@ const MAX_RETRIES_429 = 3
 const MAX_RETRIES_503 = 4
 const BASE_BACKOFF_503_MS = 2000
 // Techo de seguridad para cualquier espera individual (ya sea por retryDelay
-// de Gemini o por backoff propio), para no colgar la corrida indefinidamente.
-const MAX_SINGLE_WAIT_MS = 45000
+// de Gemini o por backoff propio). 120s cubre con margen los retryDelay
+// típicos observados en 429 (hasta ~60-90s); si Gemini pidiera más que esto,
+// lo tratamos como señal de cuota diaria agotada (ver RPD_LIKELY_THRESHOLD_MS
+// más abajo) en vez de intentar esperarlo dentro de la misma corrida.
+const MAX_SINGLE_WAIT_MS = 120000
+
+// Si Gemini sugiere esperar más que esto, ya no es un tema de RPM (por
+// minuto) sino probablemente de RPD (cuota diaria, resetea a medianoche
+// hora del Pacífico) — reintentar en la misma corrida no tiene sentido.
+const RPD_LIKELY_THRESHOLD_MS = 90000
 
 // Debe coincidir con el cron de .github/workflows/auto-analysis.yml — solo se
 // usa para estimar en los logs cuándo se reintentarán los pendientes.
@@ -84,6 +92,7 @@ interface AnalysisFile {
 interface GeminiErrorInfo {
   status: number | null
   retryAfterSeconds: number | null
+  quotaMetric: string | null
 }
 
 function parseArgs() {
@@ -146,7 +155,16 @@ function classifyGeminiError(err: unknown): GeminiErrorInfo {
     }
   }
 
-  return { status, retryAfterSeconds }
+  // Nombre del quota metric/id afectado (ej. "...GenerateRequestsPerDayPerProjectPerModel-FreeTier"
+  // vs "...GenerateRequestsPerMinutePerProjectPerModel-FreeTier"), si Gemini lo informa en los
+  // `details` del error. Ayuda a diferenciar RPM de RPD/TPM en los logs.
+  let quotaMetric: string | null = null
+  const quotaMatch = message.match(/"quotaId"\s*:\s*"([^"]+)"/i) || message.match(/"quotaMetric"\s*:\s*"([^"]+)"/i)
+  if (quotaMatch) {
+    quotaMetric = quotaMatch[1]
+  }
+
+  return { status, retryAfterSeconds, quotaMetric }
 }
 
 /** Estimación del próximo horario en que correrá el cron (redondeado hacia arriba). */
@@ -172,9 +190,11 @@ async function waitForRateLimit(): Promise<void> {
   }
 }
 
+type FailureKind = 'rate_limited' | 'unknown'
+
 type GenerateResult =
   | { ok: true; text: string }
-  | { ok: false; reason: string }
+  | { ok: false; reason: string; kind: FailureKind }
 
 async function generateForMatch(ai: GoogleGenAI, match: AnyMatch): Promise<GenerateResult> {
   let attempt429 = 0
@@ -196,14 +216,30 @@ async function generateForMatch(ai: GoogleGenAI, match: AnyMatch): Promise<Gener
       const info = classifyGeminiError(err)
 
       if (info.status === 429) {
+        // Si Gemini pide esperar más que esto, ya no es un tema de cupo por
+        // minuto — es casi seguro cuota diaria agotada. Esperar dentro de la
+        // misma corrida no sirve (resetea a medianoche hora del Pacífico):
+        // mejor rendirse ya y dejarlo claro en el log, en vez de gastar
+        // minutos del workflow reintentando algo que no se va a resolver.
+        if (info.retryAfterSeconds !== null && info.retryAfterSeconds * 1000 > RPD_LIKELY_THRESHOLD_MS) {
+          return {
+            ok: false,
+            kind: 'rate_limited',
+            reason: `429 con espera sugerida de ${info.retryAfterSeconds}s (> ${RPD_LIKELY_THRESHOLD_MS / 1000}s) — probablemente cuota diaria (RPD) agotada, no cupo por minuto. No se reintenta en esta corrida.`,
+          }
+        }
+
         attempt429++
         if (attempt429 > MAX_RETRIES_429) {
-          return { ok: false, reason: `429 (cuota excedida) tras ${MAX_RETRIES_429} reintentos` }
+          return { ok: false, kind: 'rate_limited', reason: `429 (cuota por minuto excedida) tras ${MAX_RETRIES_429} reintentos${info.quotaMetric ? ` [${info.quotaMetric}]` : ''}` }
         }
         const suggestedMs = (info.retryAfterSeconds ?? MIN_DELAY_BETWEEN_REQUESTS_MS / 1000) * 1000
+        // Se respeta el tiempo que Gemini pidió (con piso propio), nunca se
+        // recorta por debajo de lo sugerido — retomar antes de tiempo
+        // garantiza otro 429 (así se reprodujo el fallo original).
         const waitMs = clamp(suggestedMs, MIN_DELAY_BETWEEN_REQUESTS_MS, MAX_SINGLE_WAIT_MS)
         console.log(
-          `[generate-analysis] 429 en ${match.id} (intento ${attempt429}/${MAX_RETRIES_429}). ` +
+          `[generate-analysis] 429 en ${match.id} (intento ${attempt429}/${MAX_RETRIES_429})${info.quotaMetric ? ` [${info.quotaMetric}]` : ''}. ` +
           `Gemini sugirió ${info.retryAfterSeconds ?? 'sin dato'}s de espera → esperando ${Math.round(waitMs / 1000)}s antes de reintentar...`
         )
         await sleep(waitMs)
@@ -213,7 +249,7 @@ async function generateForMatch(ai: GoogleGenAI, match: AnyMatch): Promise<Gener
       if (info.status === 503) {
         attempt503++
         if (attempt503 > MAX_RETRIES_503) {
-          return { ok: false, reason: `503 (servicio sobrecargado) tras ${MAX_RETRIES_503} reintentos` }
+          return { ok: false, kind: 'rate_limited', reason: `503 (servicio sobrecargado) tras ${MAX_RETRIES_503} reintentos` }
         }
         const backoffMs = clamp(BASE_BACKOFF_503_MS * 2 ** (attempt503 - 1), 0, MAX_SINGLE_WAIT_MS)
         console.log(
@@ -226,7 +262,7 @@ async function generateForMatch(ai: GoogleGenAI, match: AnyMatch): Promise<Gener
 
       // Error no reconocido / no reintentable (ej. prompt inválido, red caída sin status).
       const msg = err instanceof Error ? err.message.slice(0, 300) : String(err)
-      return { ok: false, reason: msg }
+      return { ok: false, kind: 'unknown', reason: msg }
     }
   }
 }
@@ -258,6 +294,7 @@ async function main() {
   let skippedUpToDate = 0
   let skippedUndefined = 0
   const failedMatchIds: string[] = []
+  const unknownFailureMatchIds: string[] = []
   const cappedMatchIds: string[] = []
 
   console.log(
@@ -320,7 +357,10 @@ async function main() {
       console.log(`[generate-analysis] OK ${match.id}`)
     } else {
       failedMatchIds.push(match.id)
-      console.error(`[generate-analysis] Falló ${match.id}: ${result.reason}`)
+      if (result.kind === 'unknown') {
+        unknownFailureMatchIds.push(match.id)
+      }
+      console.error(`[generate-analysis] Falló ${match.id} [${result.kind}]: ${result.reason}`)
     }
   }
 
@@ -357,8 +397,15 @@ async function main() {
   }
   console.log('─────────────────────────────────────────────────────────')
 
-  // Falla el workflow solo si hubo partidos a procesar y TODOS los intentos fallaron.
-  if (attempted > 0 && succeeded === 0 && !dryRun) {
+  // El workflow se marca en rojo SOLO si hubo errores no reconocidos (bugs
+  // reales: prompt inválido, credenciales, etc.) — nunca por agotar
+  // reintentos de 429/503, que es comportamiento esperado y autocorrectivo
+  // (el partido queda pendiente y se reintenta solo en la próxima corrida).
+  if (unknownFailureMatchIds.length > 0 && !dryRun) {
+    console.error(
+      `[generate-analysis] ${unknownFailureMatchIds.length} error(es) no reconocido(s), requieren revisión: ` +
+      unknownFailureMatchIds.join(', ')
+    )
     process.exit(1)
   }
 }

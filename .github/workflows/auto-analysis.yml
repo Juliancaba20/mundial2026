@@ -27,6 +27,14 @@ on:
 permissions:
   contents: write
 
+# Nunca deben correr dos ejecuciones a la vez (cron + disparo manual, o dos
+# disparos manuales seguidos): comparten la misma cuota de Gemini, así que
+# solaparse duplica efectivamente la tasa de requests y provoca 429 aunque
+# cada corrida individualmente respete su propio espaciado interno.
+concurrency:
+  group: generar-analisis
+  cancel-in-progress: false
+
 jobs:
   generar-analisis:
     runs-on: ubuntu-latest
