@@ -3,9 +3,10 @@ name: Generar análisis IA de partidos
 on:
   schedule:
     # Cada 20 minutos. El script no llama a Gemini salvo que un partido haya
-    # cambiado de fingerprint (status+marcador) o se use --force, así que
-    # correr seguido no genera gasto de cuota fuera de los partidos que
-    # realmente avanzaron.
+    # cambiado de fingerprint (status+marcador) o se use --force, y aunque
+    # haya muchos partidos desactualizados a la vez, MAX_ANALYSES_PER_RUN
+    # (por defecto 5) limita cuántos se intentan por corrida — así nunca se
+    # acerca al límite de 5 req/min del plan gratuito de Gemini.
     - cron: '*/20 * * * *'
   workflow_dispatch:
     inputs:
@@ -18,6 +19,10 @@ on:
         required: false
         default: false
         type: boolean
+      max_analyses:
+        description: 'Máximo de partidos a intentar en esta corrida (por defecto 5)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -25,7 +30,11 @@ permissions:
 jobs:
   generar-analisis:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 25 min de margen: en el peor caso (varios 429/503 con reintentos y
+    # espera máxima de 45s cada uno) una corrida de 5 partidos puede tomar
+    # varios minutos; este timeout deja margen holgado sin arriesgar que se
+    # corte a mitad de una escritura de archivo.
+    timeout-minutes: 25
 
     steps:
       - name: Checkout repositorio
@@ -52,6 +61,9 @@ jobs:
           fi
           if [ "${{ inputs.force }}" = "true" ]; then
             ARGS="$ARGS --force"
+          fi
+          if [ -n "${{ inputs.max_analyses }}" ]; then
+            export MAX_ANALYSES_PER_RUN="${{ inputs.max_analyses }}"
           fi
           npx tsx scripts/generate-analysis.ts $ARGS
 
