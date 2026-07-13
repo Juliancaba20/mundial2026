@@ -9,59 +9,77 @@ interface Props {
   matchId: string
 }
 
+interface AnalysisFile {
+  text: string
+  generatedAt: string
+}
+
+// El análisis ya NO se genera en esta request: se lee como archivo estático
+// (`public/analisis/<matchId>.json`), generado únicamente por
+// `scripts/generate-analysis.ts` vía GitHub Actions (cron o disparo manual).
+// Esto garantiza que todos los usuarios vean exactamente el mismo contenido,
+// sin importar a qué instancia de Vercel llegue su request, y que un redeploy
+// nunca dispare una llamada nueva a Gemini. Ver lib/analysisVersion.ts y
+// PROJECT_CONTEXT.md para el detalle del mecanismo.
 export function MatchAnalysisClient({ matchId }: Props) {
   const [analysis, setAnalysis] = useState<string | null>(null)
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [pendingCrossover, setPendingCrossover] = useState<string | null>(null)
-  const [key, setKey] = useState(0) // used to trigger re-fetch and animation
+  const [notReady, setNotReady] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
     let active = true
 
-    async function fetchAnalysis(forceRegenerate: boolean) {
+    async function fetchAnalysis() {
       try {
-        const url = `/api/partidos/${matchId}/analysis${forceRegenerate ? '?regenerate=1' : ''}`
-        const res = await fetch(url)
-        const data = await res.json()
-        if (!res.ok) {
-          // 409: el cruce todavía no tiene ambos equipos definidos (bracket
-          // sin resolver). No es un error real, es un estado informativo.
-          if (res.status === 409) {
-            if (active) {
-              setPendingCrossover(data.error)
-              setLoading(false)
-            }
-            return
+        const res = await fetch(`/analisis/${matchId}.json`, { cache: 'no-store' })
+        if (res.status === 404) {
+          if (active) {
+            setNotReady(true)
+            setLoading(false)
           }
-          throw new Error(data.error || 'Error al generar el análisis')
+          return
         }
+        if (!res.ok) {
+          throw new Error(`No se pudo cargar el análisis (HTTP ${res.status}).`)
+        }
+        const data: AnalysisFile = await res.json()
         if (active) {
-          setAnalysis(data.analysis)
-          setPendingCrossover(null)
+          setAnalysis(data.text)
+          setGeneratedAt(data.generatedAt ?? null)
+          setNotReady(false)
           setLoading(false)
         }
       } catch (err: unknown) {
         if (active) {
-          const errMsg = err instanceof Error ? err.message : 'Ocurrió un error inesperado al conectar con el motor de IA.'
+          const errMsg = err instanceof Error ? err.message : 'Ocurrió un error inesperado al cargar el análisis.'
           setError(errMsg)
           setLoading(false)
         }
       }
     }
 
-    fetchAnalysis(key > 0)
+    fetchAnalysis()
 
     return () => {
       active = false
     }
-  }, [matchId, key])
+  }, [matchId, retryKey])
 
-  const handleRegenerate = () => {
+  const handleRetry = () => {
     setLoading(true)
     setError(null)
-    setKey(prev => prev + 1)
+    setRetryKey(prev => prev + 1)
   }
+
+  const generatedLabel = generatedAt
+    ? new Date(generatedAt).toLocaleString('es-AR', {
+        day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+        timeZone: 'America/Argentina/Buenos_Aires',
+      })
+    : null
 
   return (
     <div className="match-analysis-container" id="gemini-analysis">
@@ -74,14 +92,6 @@ export function MatchAnalysisClient({ matchId }: Props) {
           <span className="ach-title">SISTEMA DE ANÁLISIS GEMINI</span>
           <span className="ach-badge">IA ACTIVA</span>
         </div>
-        {!loading && !error && !pendingCrossover && (
-          <button onClick={handleRegenerate} className="ach-reload-btn" title="Regenerar análisis">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}>
-              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-            </svg>
-            Actualizar Análisis
-          </button>
-        )}
       </div>
 
       <AnimatePresence mode="wait">
@@ -96,7 +106,7 @@ export function MatchAnalysisClient({ matchId }: Props) {
           >
             <div className="loading-pulse-container">
               <div className="radar-circle" />
-              <span className="loading-status-text">Procesando pizarras tácticas, estadísticas históricas de FIFA y planteles oficiales...</span>
+              <span className="loading-status-text">Cargando análisis táctico...</span>
             </div>
 
             <div className="skeleton-rows">
@@ -111,9 +121,9 @@ export function MatchAnalysisClient({ matchId }: Props) {
           </motion.div>
         )}
 
-        {!loading && pendingCrossover && !error && (
+        {!loading && notReady && !error && (
           <motion.div
-            key="pending-crossover"
+            key="not-ready"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -127,7 +137,11 @@ export function MatchAnalysisClient({ matchId }: Props) {
             </div>
             <div className="pending-details">
               <h4>Análisis disponible próximamente</h4>
-              <p>{pendingCrossover}</p>
+              <p>
+                Este análisis todavía no fue generado — puede deberse a que el cruce aún no tiene
+                ambos equipos definidos, o a que se está preparando para este partido. Se genera
+                automáticamente y se actualiza cuando cambia el resultado.
+              </p>
             </div>
           </motion.div>
         )}
@@ -150,14 +164,14 @@ export function MatchAnalysisClient({ matchId }: Props) {
             <div className="error-details">
               <h4>No se pudo cargar el análisis táctico</h4>
               <p>{error}</p>
-              <button onClick={handleRegenerate} className="error-retry-btn">
-                Reintentar generación
+              <button onClick={handleRetry} className="error-retry-btn">
+                Reintentar
               </button>
             </div>
           </motion.div>
         )}
 
-        {!loading && !error && analysis && (
+        {!loading && !error && !notReady && analysis && (
           <motion.div
             key="content"
             initial={{ opacity: 0, y: 15 }}
@@ -170,9 +184,9 @@ export function MatchAnalysisClient({ matchId }: Props) {
                 {analysis}
               </ReactMarkdown>
             </div>
-            
+
             <div className="analysis-footer">
-              <span className="footer-tag">Desarrollado por Gemini 3.5 Flash · Análisis en tiempo real</span>
+              <span className="footer-tag">Generado por Gemini 3.5 Flash{generatedLabel ? ` · ${generatedLabel}` : ''}</span>
               <span className="footer-disclaimer">Las predicciones y análisis tácticos son simulaciones algorítmicas basadas en datos deportivos.</span>
             </div>
           </motion.div>
@@ -255,25 +269,6 @@ export function MatchAnalysisClient({ matchId }: Props) {
           padding: 2px 6px;
           border-radius: 4px;
           letter-spacing: 0.05em;
-        }
-
-        .ach-reload-btn {
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          color: #7D8590;
-          font-size: 11px;
-          font-weight: 600;
-          padding: 6px 12px;
-          border-radius: 6px;
-          display: flex;
-          align-items: center;
-          transition: all 0.2s;
-        }
-
-        .ach-reload-btn:hover {
-          background: rgba(255, 255, 255, 0.08);
-          border-color: rgba(255, 255, 255, 0.15);
-          color: #E6EDF3;
         }
 
         .analysis-loading-pane {
@@ -409,6 +404,7 @@ export function MatchAnalysisClient({ matchId }: Props) {
           color: #E6EDF3;
           font-size: 14.5px;
           line-height: 1.7;
+          max-width: 720px;
         }
 
         .markdown-body h3 {

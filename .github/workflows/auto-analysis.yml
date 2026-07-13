@@ -1,0 +1,68 @@
+name: Generar análisis IA de partidos
+
+on:
+  schedule:
+    # Cada 20 minutos. El script no llama a Gemini salvo que un partido haya
+    # cambiado de fingerprint (status+marcador) o se use --force, así que
+    # correr seguido no genera gasto de cuota fuera de los partidos que
+    # realmente avanzaron.
+    - cron: '*/20 * * * *'
+  workflow_dispatch:
+    inputs:
+      match_id:
+        description: 'ID de un partido puntual (ej. A1, R32_3). Vacío = revisar todos.'
+        required: false
+        default: ''
+      force:
+        description: 'Forzar regeneración aunque no haya cambiado el fingerprint'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  generar-analisis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Generar análisis
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          ARGS=""
+          if [ -n "${{ inputs.match_id }}" ]; then
+            ARGS="$ARGS --match=${{ inputs.match_id }}"
+          fi
+          if [ "${{ inputs.force }}" = "true" ]; then
+            ARGS="$ARGS --force"
+          fi
+          npx tsx scripts/generate-analysis.ts $ARGS
+
+      - name: Commit y push si hay cambios
+        run: |
+          git config user.name "mundial-bot"
+          git config user.email "bot@mundial2026.app"
+          git add public/analisis/
+          if git diff --cached --quiet; then
+            echo "Sin cambios en public/analisis/. Nada que commitear."
+          else
+            git commit -m "analisis: auto-actualización $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push origin main
+          fi

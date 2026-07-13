@@ -1,6 +1,6 @@
 // ─── Helpers compartidos de partidos ─────────────────────────────────────────
 // Centraliza lógica que antes estaba duplicada entre
-// `app/partidos/[id]/page.tsx` y `app/api/partidos/[id]/analysis/route.ts`.
+// `app/partidos/[id]/page.tsx` y `scripts/generate-analysis.ts`.
 // Cualquier cambio en la forma de `Match`/`BracketMatch` solo debe tocarse acá.
 
 import { cache } from 'react'
