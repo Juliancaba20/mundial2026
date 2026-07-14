@@ -81,12 +81,21 @@ const RPD_LIKELY_THRESHOLD_MS = 90000
 // usa para estimar en los logs cuándo se reintentarán los pendientes.
 const CRON_INTERVAL_MINUTES = 20
 
+interface AnalysisSource {
+  uri: string
+  title: string
+}
+
 interface AnalysisFile {
   matchId: string
   analysisVersion: number
   fingerprint: string
   text: string
   generatedAt: string
+  /** true si se generó con Google Search grounding (partidos done/live). */
+  grounded: boolean
+  /** Fuentes reales devueltas por el grounding, si las hubo. */
+  sources: AnalysisSource[]
 }
 
 interface GeminiErrorInfo {
@@ -193,7 +202,7 @@ async function waitForRateLimit(): Promise<void> {
 type FailureKind = 'rate_limited' | 'unknown'
 
 type GenerateResult =
-  | { ok: true; text: string }
+  | { ok: true; text: string; grounded: boolean; sources: AnalysisSource[] }
   | { ok: false; reason: string; kind: FailureKind }
 
 async function generateForMatch(ai: GoogleGenAI, match: AnyMatch): Promise<GenerateResult> {
@@ -205,13 +214,28 @@ async function generateForMatch(ai: GoogleGenAI, match: AnyMatch): Promise<Gener
     lastRequestAt = Date.now()
 
     try {
-      const { systemInstruction, prompt } = buildAnalysisPrompt(match)
+      const { systemInstruction, prompt, useGrounding } = buildAnalysisPrompt(match)
       const response = await ai.models.generateContent({
         model: GEMINI_MODEL,
         contents: prompt,
-        config: { systemInstruction, temperature: 0.7 },
+        config: {
+          systemInstruction,
+          temperature: 0.7,
+          tools: useGrounding ? [{ googleSearch: {} }] : undefined,
+        },
       })
-      return { ok: true, text: response.text || 'No se pudo generar el análisis.' }
+
+      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks ?? []
+      const sources: AnalysisSource[] = chunks
+        .map(c => ({ uri: c.web?.uri ?? '', title: c.web?.title ?? '' }))
+        .filter(s => s.uri)
+
+      return {
+        ok: true,
+        text: response.text || 'No se pudo generar el análisis.',
+        grounded: useGrounding,
+        sources,
+      }
     } catch (err) {
       const info = classifyGeminiError(err)
 
@@ -331,12 +355,12 @@ async function main() {
     attempted++
 
     if (dryRun) {
-      console.log(`[generate-analysis] (dry-run) Generaría análisis para ${match.id} (fingerprint: ${fingerprint})`)
+      console.log(`[generate-analysis] (dry-run) Generaría análisis para ${match.id} (fingerprint: ${fingerprint}, grounding: ${match.status !== 'pending' ? 'sí' : 'no'})`)
       succeeded++
       continue
     }
 
-    console.log(`[generate-analysis] Procesando ${match.id} (fingerprint: ${fingerprint}) — ${attempted}/${MAX_ANALYSES_PER_RUN} de esta corrida...`)
+    console.log(`[generate-analysis] Procesando ${match.id} (fingerprint: ${fingerprint}, grounding: ${match.status !== 'pending' ? 'sí' : 'no'}) — ${attempted}/${MAX_ANALYSES_PER_RUN} de esta corrida...`)
 
     const result = await generateForMatch(ai, match)
 
@@ -347,6 +371,8 @@ async function main() {
         fingerprint,
         text: result.text,
         generatedAt: new Date().toISOString(),
+        grounded: result.grounded,
+        sources: result.sources,
       }
       fs.writeFileSync(
         path.join(OUTPUT_DIR, `${match.id}.json`),

@@ -9,9 +9,16 @@ interface Props {
   matchId: string
 }
 
+interface AnalysisSource {
+  uri: string
+  title: string
+}
+
 interface AnalysisFile {
   text: string
   generatedAt: string
+  grounded?: boolean
+  sources?: AnalysisSource[]
 }
 
 // El análisis ya NO se genera en esta request: se lee como archivo estático
@@ -24,6 +31,8 @@ interface AnalysisFile {
 export function MatchAnalysisClient({ matchId }: Props) {
   const [analysis, setAnalysis] = useState<string | null>(null)
   const [generatedAt, setGeneratedAt] = useState<string | null>(null)
+  const [grounded, setGrounded] = useState<boolean>(false)
+  const [sources, setSources] = useState<AnalysisSource[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [notReady, setNotReady] = useState(false)
@@ -49,6 +58,8 @@ export function MatchAnalysisClient({ matchId }: Props) {
         if (active) {
           setAnalysis(data.text)
           setGeneratedAt(data.generatedAt ?? null)
+          setGrounded(Boolean(data.grounded))
+          setSources(data.sources ?? [])
           setNotReady(false)
           setLoading(false)
         }
@@ -186,8 +197,35 @@ export function MatchAnalysisClient({ matchId }: Props) {
             </div>
 
             <div className="analysis-footer">
-              <span className="footer-tag">Generado por Gemini 3.5 Flash{generatedLabel ? ` · ${generatedLabel}` : ''}</span>
-              <span className="footer-disclaimer">Las predicciones y análisis tácticos son simulaciones algorítmicas basadas en datos deportivos.</span>
+              <div className="footer-top-row">
+                <span className="footer-tag">Generado por Gemini 3.5 Flash{generatedLabel ? ` · ${generatedLabel}` : ''}</span>
+                {grounded ? (
+                  <span className="footer-grounded-badge">✓ Verificado con búsqueda</span>
+                ) : (
+                  <span className="footer-speculative-badge">🔮 Pronóstico especulativo</span>
+                )}
+              </div>
+              <span className="footer-disclaimer">
+                {grounded
+                  ? 'La crónica y los datos puntuales de este partido se buscaron y verificaron en fuentes reales. Aun así, la IA puede cometer errores — ante cualquier duda, contrastá con las fuentes.'
+                  : 'Este partido todavía no se jugó: la predicción y el marcador estimado son una simulación especulativa de la IA, no un hecho ni una proyección estadística.'}
+              </span>
+              {sources.length > 0 && (
+                <div className="footer-sources">
+                  <span className="footer-sources-label">Fuentes:</span>
+                  {sources.slice(0, 5).map((s, i) => {
+                    let label = s.title
+                    if (!label) {
+                      try { label = new URL(s.uri).hostname } catch { label = s.uri }
+                    }
+                    return (
+                      <a key={i} href={s.uri} target="_blank" rel="noopener noreferrer" className="footer-source-link">
+                        {label}
+                      </a>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -449,9 +487,15 @@ export function MatchAnalysisClient({ matchId }: Props) {
           padding-top: 16px;
           border-top: 1px solid rgba(255, 255, 255, 0.06);
           display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .footer-top-row {
+          display: flex;
           justify-content: space-between;
           align-items: center;
-          gap: 16px;
+          gap: 12px;
           flex-wrap: wrap;
         }
 
@@ -463,14 +507,58 @@ export function MatchAnalysisClient({ matchId }: Props) {
           letter-spacing: 0.05em;
         }
 
+        .footer-grounded-badge {
+          font-size: 10.5px;
+          font-weight: 700;
+          color: #00A86B;
+          background: rgba(0, 168, 107, 0.1);
+          border: 1px solid rgba(0, 168, 107, 0.25);
+          padding: 2px 8px;
+          border-radius: 999px;
+        }
+
+        .footer-speculative-badge {
+          font-size: 10.5px;
+          font-weight: 700;
+          color: #C9A84C;
+          background: rgba(201, 168, 76, 0.1);
+          border: 1px solid rgba(201, 168, 76, 0.25);
+          padding: 2px 8px;
+          border-radius: 999px;
+        }
+
         .footer-disclaimer {
           font-size: 10.5px;
           color: #7D8590;
           font-style: italic;
+          line-height: 1.5;
+        }
+
+        .footer-sources {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+          font-size: 10.5px;
+        }
+
+        .footer-sources-label {
+          color: #7D8590;
+          font-weight: 600;
+        }
+
+        .footer-source-link {
+          color: #6AB0FF;
+          text-decoration: underline;
+          text-underline-offset: 2px;
+        }
+
+        .footer-source-link:hover {
+          color: #8FC4FF;
         }
 
         @media (max-width: 640px) {
-          .analysis-footer {
+          .footer-top-row {
             flex-direction: column;
             align-items: flex-start;
             gap: 8px;
