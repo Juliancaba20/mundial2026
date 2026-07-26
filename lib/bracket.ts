@@ -95,13 +95,16 @@ function resolveMatchResult(
   away: TeamRef,
   knockoutResults: KnockoutResultsMap
 ): ResolvedResult | null {
-  const homeResult = knockoutResults[home.slug]
-  const awayResult = knockoutResults[away.slug]
+  // Cada equipo puede tener varios cruces de eliminatorias en su historial
+  // (semifinal y luego final/3er puesto): buscamos específicamente el cruce
+  // contra ESTE rival, no el más reciente del equipo.
+  const homeHistory = knockoutResults[home.slug] ?? []
+  const awayHistory = knockoutResults[away.slug] ?? []
 
   // Preferimos el resultado visto desde el lado "home": si ESPN reportó que
   // el rival de `home` fue exactamente `away`, es el mismo partido.
-  const fromHome = homeResult && homeResult.opponentSlug === away.slug ? homeResult : null
-  const fromAway = awayResult && awayResult.opponentSlug === home.slug ? awayResult : null
+  const fromHome = homeHistory.find(h => h.opponentSlug === away.slug) ?? null
+  const fromAway = awayHistory.find(h => h.opponentSlug === home.slug) ?? null
   const result = fromHome ?? fromAway
   if (!result) return null
 
@@ -317,6 +320,24 @@ export function buildBracket(matches: Match[], knockoutResults: KnockoutResultsM
   const sfFilled = step4.current
   const finalFilled = step4.next
 
+  // El 3er puesto lo juegan los PERDEDORES de semis, no los ganadores: hay que
+  // asignar sus equipos aparte, porque propagateRound solo empuja ganadores.
+  // IMPORTANTE: esto tiene que pasar ANTES de resolver los resultados de
+  // finalFilled — si no, cuando el loop de abajo procesa el partido '3RD'
+  // todavía no tiene home/away asignados y lo salta, dejando el 3er puesto
+  // sin resultado para siempre (bug real, jul 2026: el equipo sí terminaba
+  // asignado, pero el marcador nunca se calculaba porque llegaba tarde).
+  for (const sfMatch of sfFilled) {
+    if (!sfMatch.home.team || !sfMatch.away.team) continue
+    const result = resolveMatchResult(sfMatch.home.team, sfMatch.away.team, knockoutResults)
+    if (!result || result.kind !== 'done') continue
+    const loser = result.winner.slug === sfMatch.home.team.slug ? sfMatch.away.team : sfMatch.home.team
+    const thirdMatch = finalFilled.find(m => m.id === '3RD')
+    if (!thirdMatch) continue
+    if (sfMatch.id === 'SF-1') thirdMatch.home = teamSlot(loser, thirdMatch.home.label)
+    if (sfMatch.id === 'SF-2') thirdMatch.away = teamSlot(loser, thirdMatch.away.label)
+  }
+
   // Final y 3er puesto nunca son "currentRound" de un propagateRound (no hay
   // ronda siguiente a la que empujar un ganador), así que su propio estado
   // en vivo/finalizado nunca se calculaba — quedaban en 'pending' para
@@ -336,19 +357,6 @@ export function buildBracket(matches: Match[], knockoutResults: KnockoutResultsM
       match.status = 'done'
       match.clock = undefined
     }
-  }
-
-  // El 3er puesto lo juegan los PERDEDORES de semis, no los ganadores: hay que
-  // resolverlo aparte, porque propagateRound solo empuja ganadores.
-  for (const sfMatch of sfFilled) {
-    if (!sfMatch.home.team || !sfMatch.away.team) continue
-    const result = resolveMatchResult(sfMatch.home.team, sfMatch.away.team, knockoutResults)
-    if (!result || result.kind !== 'done') continue
-    const loser = result.winner.slug === sfMatch.home.team.slug ? sfMatch.away.team : sfMatch.home.team
-    const thirdMatch = finalFilled.find(m => m.id === '3RD')
-    if (!thirdMatch) continue
-    if (sfMatch.id === 'SF-1') thirdMatch.home = teamSlot(loser, thirdMatch.home.label)
-    if (sfMatch.id === 'SF-2') thirdMatch.away = teamSlot(loser, thirdMatch.away.label)
   }
 
   return [...r32Filled, ...r16Filled, ...qfFilled, ...sfFilled, ...finalFilled]

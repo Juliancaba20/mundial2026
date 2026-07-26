@@ -156,8 +156,15 @@ export type LiveResultsMap = Record<string, LiveResult>
 // ─── Resultados de eliminatorias (por equipo, no por par fijo) ───────────────
 // En knockout el rival de cada equipo no se conoce de antemano (depende del
 // bracket calculado en runtime), así que no podemos indexar por "home_away"
-// como en grupos. Indexamos por slug de equipo: cada equipo apunta a su
-// partido de eliminatorias más reciente conocido por ESPN.
+// como en grupos. Indexamos por slug de equipo.
+//
+// Un mismo equipo puede jugar VARIOS partidos de eliminatorias en el torneo
+// (ej. semifinal el 14/15 jul y luego 3er puesto o final unos días después).
+// Por eso cada equipo guarda un HISTORIAL (array), no un único resultado:
+// guardar solo "el más reciente" pisaba el resultado de la semifinal en
+// cuanto ESPN reportaba el partido siguiente del mismo equipo, y
+// resolveMatchResult() dejaba de encontrar el cruce semifinal → SF-1/SF-2,
+// Final y 3er puesto quedaban sin resultado (bug real, jul 2026).
 
 export interface KnockoutTeamResult {
   opponentSlug: string | null  // null si el rival no se reconoció como equipo propio
@@ -173,4 +180,5 @@ export interface KnockoutTeamResult {
   clock: string
 }
 
-export type KnockoutResultsMap = Record<string, KnockoutTeamResult>
+// Historial de partidos de eliminatorias por equipo (uno por cruce distinto).
+export type KnockoutResultsMap = Record<string, KnockoutTeamResult[]>

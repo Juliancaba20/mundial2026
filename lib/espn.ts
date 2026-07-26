@@ -1,4 +1,4 @@
-import type { ESPNResponse, LiveResult, LiveResultsMap, KnockoutResultsMap, Match } from '@/types'
+import type { ESPNResponse, LiveResult, LiveResultsMap, KnockoutResultsMap, KnockoutTeamResult, Match } from '@/types'
 import { BASE_MATCHES, TEAMS } from '@/lib/data'
 
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard'
@@ -126,6 +126,34 @@ function matchTeamName(espnName: string, ourName: string): boolean {
 
   // 3. Fallback primeros 6 chars (solo casos no cubiertos por alias)
   return ea.slice(0, 6) === oa.slice(0, 6)
+}
+
+// Guarda/actualiza el resultado de UN cruce de eliminatorias dentro del
+// historial del equipo. Un equipo puede tener varios cruces en el torneo
+// (semifinal y luego final/3er puesto): si ya existe una entrada contra ESE
+// rival la actualiza (útil para pasar de "live" a "done"); si es un rival
+// nuevo, la agrega al final sin tocar las anteriores. Devuelve true si
+// escribió/actualizó algo.
+function upsertKnockoutResult(
+  map: KnockoutResultsMap,
+  teamSlug: string,
+  entry: KnockoutTeamResult
+): boolean {
+  const history = map[teamSlug] ?? (map[teamSlug] = [])
+  const existingIdx = entry.opponentSlug
+    ? history.findIndex(h => h.opponentSlug === entry.opponentSlug)
+    : history.findIndex(h => h.opponentName === entry.opponentName)
+
+  if (existingIdx === -1) {
+    history.push(entry)
+    return true
+  }
+
+  const existing = history[existingIdx]
+  // No sobreescribir un resultado final con uno más viejo/en vivo del mismo cruce
+  if (existing.status === 'done' && entry.status !== 'done') return false
+  history[existingIdx] = entry
+  return true
 }
 
 async function fetchDateResults(
@@ -274,36 +302,27 @@ export async function fetchLiveResults(): Promise<FetchResultsOutput> {
 
       if (homeTeam || awayTeam) {
         const statusKO: Match['status'] = actuallyDone ? 'done' : 'live'
-        // No sobreescribir un resultado final con uno más viejo/en vivo
         if (homeTeam) {
-          const prev = knockoutResults[homeTeam.slug]
-          if (!(prev?.status === 'done' && !actuallyDone)) {
-            knockoutResults[homeTeam.slug] = {
-              opponentSlug: awayTeam?.slug ?? null,
-              opponentName: atName,
-              ownScore: ht.score,
-              opponentScore: at.score,
-              isWinner: typeof ht.winner === 'boolean' ? ht.winner : null,
-              status: statusKO,
-              clock: ev.status?.displayClock ?? '',
-            }
-            knockoutMatched++
-          }
+          if (upsertKnockoutResult(knockoutResults, homeTeam.slug, {
+            opponentSlug: awayTeam?.slug ?? null,
+            opponentName: atName,
+            ownScore: ht.score,
+            opponentScore: at.score,
+            isWinner: typeof ht.winner === 'boolean' ? ht.winner : null,
+            status: statusKO,
+            clock: ev.status?.displayClock ?? '',
+          })) knockoutMatched++
         }
         if (awayTeam) {
-          const prev = knockoutResults[awayTeam.slug]
-          if (!(prev?.status === 'done' && !actuallyDone)) {
-            knockoutResults[awayTeam.slug] = {
-              opponentSlug: homeTeam?.slug ?? null,
-              opponentName: htName,
-              ownScore: at.score,
-              opponentScore: ht.score,
-              isWinner: typeof at.winner === 'boolean' ? at.winner : null,
-              status: statusKO,
-              clock: ev.status?.displayClock ?? '',
-            }
-            knockoutMatched++
-          }
+          if (upsertKnockoutResult(knockoutResults, awayTeam.slug, {
+            opponentSlug: homeTeam?.slug ?? null,
+            opponentName: htName,
+            ownScore: at.score,
+            opponentScore: ht.score,
+            isWinner: typeof at.winner === 'boolean' ? at.winner : null,
+            status: statusKO,
+            clock: ev.status?.displayClock ?? '',
+          })) knockoutMatched++
         }
       }
     }
